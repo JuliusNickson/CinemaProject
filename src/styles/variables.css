@@ -18,6 +18,10 @@
   --color-tint-white: rgb(255 255 255 / 0.1);
   --color-tint-brand: rgb(236 48 19 / 0.1);
   --color-tint-success: rgb(74 222 128 / 0.1);
+  --color-tint-warning: rgb(226 126 4 / 0.1);
+
+  /* Overlay */
+  --color-scrim: rgb(7 12 28 / 0.2);
 
   /* Typography: Archivo Regular 400, SemiBold 600, ExtraBold 800 */
   --font-family: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -42,11 +46,15 @@
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
   --radius-full: 999px;
 
   /* Layout */
   --page-max-width: 1728px;
   --page-padding-x: var(--space-15);
+  --section-padding-x: 70px;
+  --hero-padding-x: 67px;
   --navbar-height: 111px;
   --control-height: 40px;
 
@@ -56,11 +64,15 @@
 @media (max-width: 1024px) {
   :root {
     --page-padding-x: var(--space-8);
+    --section-padding-x: var(--space-8);
+    --hero-padding-x: var(--space-8);
   }
 }
 
 @media (max-width: 640px) {
   :root {
     --page-padding-x: var(--space-4);
+    --section-padding-x: var(--space-4);
+    --hero-padding-x: var(--space-4);
   }
 }

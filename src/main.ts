@@ -28,7 +28,7 @@ async function start(): Promise<void> {
   root.replaceChildren(toElement(html`<div class="app-loading" role="status">Loading…</div>`));
   await bootstrap();
 
-  const outlet = toElement(html`<main class="app-main container"></main>`);
+  const outlet = toElement(html`<main class="app-main"></main>`);
   root.replaceChildren(Navbar({ onLogOut: handleLogOut }), outlet);
 
   startRouter({
