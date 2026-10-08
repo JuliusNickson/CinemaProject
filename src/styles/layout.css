@@ -1,0 +1,35 @@
+.app-loading {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  color: var(--color-text-muted);
+}
+
+.app-main {
+  padding-block: var(--space-8) var(--space-12);
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.page--centered {
+  align-items: center;
+  padding-block: var(--space-12);
+  text-align: center;
+}
+
+.page__title {
+  font-size: var(--font-size-xl);
+  line-height: 1.2;
+}
+
+.page__placeholder {
+  color: var(--color-text-muted);
+}
+
+.page-error {
+  color: var(--color-danger);
+}
