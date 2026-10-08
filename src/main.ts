@@ -1,6 +1,7 @@
 import "./styles/main.css";
 
 import { logout } from "./api/authApi";
+import { Footer } from "./components/Footer";
 import { Navbar } from "./components/Navbar";
 import { HomePage } from "./pages/HomePage";
 import { MovieDetailsPage } from "./pages/MovieDetailsPage";
@@ -29,7 +30,7 @@ async function start(): Promise<void> {
   await bootstrap();
 
   const outlet = toElement(html`<main class="app-main"></main>`);
-  root.replaceChildren(Navbar({ onLogOut: handleLogOut }), outlet);
+  root.replaceChildren(Navbar({ onLogOut: handleLogOut }), outlet, Footer());
 
   startRouter({
     outlet,

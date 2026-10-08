@@ -5,8 +5,14 @@
   color: var(--color-text-secondary);
 }
 
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
 .app-main {
-  display: block;
+  flex: 1;
 }
 
 .page {
