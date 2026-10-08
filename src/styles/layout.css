@@ -2,11 +2,11 @@
   display: grid;
   place-items: center;
   min-height: 100vh;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .app-main {
-  padding-block: var(--space-8) var(--space-12);
+  padding-block: calc(var(--navbar-height) + var(--space-8)) var(--space-12);
 }
 
 .page {
@@ -22,14 +22,15 @@
 }
 
 .page__title {
-  font-size: var(--font-size-xl);
-  line-height: 1.2;
+  font-size: 24px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: normal;
 }
 
 .page__placeholder {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .page-error {
-  color: var(--color-danger);
+  color: var(--color-brand);
 }

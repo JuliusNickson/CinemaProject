@@ -11,11 +11,12 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--color-bg-page);
+  color: var(--color-text-primary);
   font-family: var(--font-family);
-  font-size: var(--font-size-base);
-  line-height: 1.5;
+  font-size: 16px;
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -45,21 +46,21 @@ p {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-brand);
   outline-offset: 2px;
 }
 
 code {
   padding: 0 var(--space-1);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
+  background: var(--color-bg-raised);
 }
 
 .container {
   width: 100%;
-  max-width: var(--container-width);
+  max-width: var(--page-max-width);
   margin-inline: auto;
-  padding-inline: var(--space-6);
+  padding-inline: var(--page-padding-x);
 }
 
 .button {
@@ -67,15 +68,20 @@ code {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
+  height: var(--control-height);
+  padding: 0 22px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   background: none;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: normal;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background var(--transition),
-    border-color var(--transition);
+    border-color var(--transition),
+    opacity var(--transition);
 }
 
 .button:disabled {
@@ -84,17 +90,27 @@ code {
 }
 
 .button--primary {
-  background: var(--color-primary);
+  background: var(--color-brand);
+  color: var(--color-text-primary);
 }
 
 .button--primary:not(:disabled):hover {
-  background: var(--color-primary-hover);
+  background: color-mix(in srgb, var(--color-brand) 85%, black);
+}
+
+.button--light {
+  background: var(--color-text-primary);
+  color: var(--color-bg-page);
+}
+
+.button--light:not(:disabled):hover {
+  background: color-mix(in srgb, var(--color-text-primary) 85%, black);
 }
 
 .button--ghost {
-  border-color: var(--color-border);
+  border-color: var(--color-bg-raised);
 }
 
 .button--ghost:not(:disabled):hover {
-  background: var(--color-surface-raised);
+  background: var(--color-tint-white);
 }
