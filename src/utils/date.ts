@@ -4,9 +4,37 @@ export function parseIsoDate(iso: string): Date {
   return new Date(year, month - 1, day);
 }
 
+/** Local `YYYY-MM-DD` for a date. */
+export function toIsoDate(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+export function todayIso(): string {
+  return toIsoDate(new Date());
+}
+
+/** Today and the following days, as `YYYY-MM-DD`. */
+export function upcomingIsoDates(count: number): string[] {
+  const start = new Date();
+  return Array.from({ length: count }, (_, offset) =>
+    toIsoDate(new Date(start.getFullYear(), start.getMonth(), start.getDate() + offset)),
+  );
+}
+
+export function isIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && toIsoDate(parseIsoDate(value)) === value;
+}
+
 /** `2026-09-15` → `15 SEPT` (short) or `15 SEPTEMBER` (long). */
 export function formatDayMonth(iso: string, month: "short" | "long" = "short"): string {
   const date = parseIsoDate(iso);
   const monthName = new Intl.DateTimeFormat("en-GB", { month }).format(date);
   return `${date.getDate()} ${monthName}`.toUpperCase();
+}
+
+/** `2026-09-15` → `Tue` */
+export function formatWeekday(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", { weekday: "short" }).format(parseIsoDate(iso));
 }
