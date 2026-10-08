@@ -1,0 +1,258 @@
+.hero {
+  position: relative;
+  height: 760px;
+  overflow: hidden;
+  background: var(--color-bg-card);
+}
+
+.hero__slides {
+  position: absolute;
+  inset: 0;
+}
+
+.hero__slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 700ms ease;
+}
+
+.hero__slide--active {
+  opacity: 1;
+}
+
+/* Taller than the hero and shifted up to keep the design's crop. */
+.hero__backdrop {
+  position: absolute;
+  top: -11.65%;
+  left: 0;
+  width: 100%;
+  height: 139.83%;
+  object-fit: cover;
+}
+
+.hero__slide::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(270deg, rgb(0 0 0 / 0.08) 0%, rgb(0 0 0 / 0.8) 100%);
+}
+
+.hero__frame {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  max-width: var(--page-max-width);
+  margin-inline: auto;
+}
+
+.hero__content {
+  position: absolute;
+  top: 325px;
+  left: var(--hero-padding-x);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 580px;
+  max-width: calc(100% - 2 * var(--hero-padding-x));
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 250ms ease,
+    transform 250ms ease;
+}
+
+.hero__slide--active .hero__content {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 500ms ease 300ms,
+    transform 500ms ease 300ms;
+}
+
+.hero__body,
+.hero__details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.hero__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.hero__title {
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.hero__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.hero__synopsis {
+  display: -webkit-box;
+  width: 560px;
+  max-width: 100%;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Controls */
+
+.hero__frame--controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hero__controls {
+  position: absolute;
+  top: 664px;
+  right: var(--hero-padding-x);
+  left: var(--hero-padding-x);
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  pointer-events: auto;
+}
+
+.hero__progress {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 7px;
+}
+
+.hero__bar {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.hero__bar::before {
+  content: "";
+  display: block;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-primary);
+}
+
+.hero__bar-fill {
+  display: block;
+  height: 3px;
+  margin-top: -3px;
+  border-radius: var(--radius-full);
+  background: var(--color-brand);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.hero__bar--active .hero__bar-fill {
+  animation: hero-progress var(--hero-interval, 7000ms) linear forwards;
+}
+
+.hero:hover .hero__bar-fill,
+.hero:focus-within .hero__bar-fill {
+  animation-play-state: paused;
+}
+
+@keyframes hero-progress {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.hero__arrows {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hero__arrow {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-scrim);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.hero__arrow:hover {
+  background: rgb(7 12 28 / 0.5);
+}
+
+.hero--single .hero__controls {
+  display: none;
+}
+
+/* States */
+
+.hero__message {
+  display: grid;
+  place-content: center;
+  gap: var(--space-4);
+  justify-items: center;
+  height: 100%;
+  color: var(--color-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__slide,
+  .hero__content {
+    transition: none;
+  }
+
+  .hero__bar--active .hero__bar-fill {
+    animation: none;
+    transform: none;
+  }
+}
+
+@media (max-width: 1024px) {
+  .hero {
+    height: 640px;
+  }
+
+  .hero__content {
+    top: auto;
+    bottom: 128px;
+  }
+
+  .hero__controls {
+    top: auto;
+    bottom: 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    height: 600px;
+  }
+
+  .hero__title {
+    font-size: 28px;
+  }
+
+  .hero__arrows {
+    display: none;
+  }
+}
