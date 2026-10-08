@@ -4,7 +4,11 @@ export interface RouteContext {
   query: URLSearchParams;
   /** Aborted when the user navigates away; use it for fetches and subscriptions. */
   signal: AbortSignal;
+  /** Keeps the page mounted when only the query string changes and calls `handler` instead. */
+  onQueryChange: (handler: QueryChangeHandler) => void;
 }
+
+export type QueryChangeHandler = (query: URLSearchParams) => void;
 
 export type Page = (context: RouteContext) => HTMLElement;
 
@@ -26,6 +30,7 @@ let notFoundPage: Page | null = null;
 let outlet: HTMLElement | null = null;
 let currentController: AbortController | null = null;
 let currentPath = "";
+let queryChangeHandler: QueryChangeHandler | null = null;
 const listeners = new Set<RouteListener>();
 
 /** `/movies/:slug` → a regex capturing `slug`. */
@@ -60,10 +65,17 @@ function match(path: string): { page: Page; params: Record<string, string> } | n
 function render(): void {
   if (!outlet) return;
 
+  const url = new URL(window.location.href);
+
+  if (url.pathname === currentPath && queryChangeHandler) {
+    queryChangeHandler(url.searchParams);
+    listeners.forEach((listener) => listener(currentPath));
+    return;
+  }
+
   currentController?.abort();
   currentController = new AbortController();
-
-  const url = new URL(window.location.href);
+  queryChangeHandler = null;
   currentPath = url.pathname;
 
   const matched = match(url.pathname);
@@ -75,6 +87,9 @@ function render(): void {
     params: matched?.params ?? {},
     query: url.searchParams,
     signal: currentController.signal,
+    onQueryChange: (handler) => {
+      queryChangeHandler = handler;
+    },
   };
 
   try {
