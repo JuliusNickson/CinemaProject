@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.local
+.env.*.local
+/Info.md
+*.log
+.DS_Store
+._*
