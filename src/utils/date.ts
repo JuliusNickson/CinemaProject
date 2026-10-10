@@ -34,6 +34,29 @@ export function formatDayMonth(iso: string, month: "short" | "long" = "short"): 
   return `${date.getDate()} ${monthName}`.toUpperCase();
 }
 
+/** `2026-09-04` → `4 September 2026` */
+export function formatFullDate(iso: string): string {
+  const date = parseIsoDate(iso);
+  const month = new Intl.DateTimeFormat("en-GB", { month: "long" }).format(date);
+  return `${date.getDate()} ${month} ${date.getFullYear()}`;
+}
+
+/** `2026-09-15` → `Tuesday 15 September` */
+export function formatSessionDate(iso: string): string {
+  const date = parseIsoDate(iso);
+  const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "long" }).format(date);
+  const month = new Intl.DateTimeFormat("en-GB", { month: "long" }).format(date);
+  return `${weekday} ${date.getDate()} ${month}`;
+}
+
+/** `2026-09-15` → `Tue 15 Sep` */
+export function formatShortSessionDate(iso: string): string {
+  const date = parseIsoDate(iso);
+  const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "short" }).format(date);
+  const month = new Intl.DateTimeFormat("en-GB", { month: "short" }).format(date);
+  return `${weekday} ${date.getDate()} ${month}`;
+}
+
 /** `2026-09-15` → `Tue` */
 export function formatWeekday(iso: string): string {
   return new Intl.DateTimeFormat("en-GB", { weekday: "short" }).format(parseIsoDate(iso));
