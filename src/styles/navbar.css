@@ -94,8 +94,111 @@
   opacity: 1;
 }
 
-.navbar__search:focus-within {
-  box-shadow: 0 0 0 1px var(--color-text-secondary);
+.navbar__search-wrap {
+  position: relative;
+  z-index: 3;
+}
+
+.navbar__search--open {
+  width: 480px;
+  max-width: min(480px, 70vw);
+  padding: 6px 12px 6px 22px;
+  border: 1px solid var(--color-tint-white);
+  backdrop-filter: blur(7px);
+}
+
+.navbar__search--open.navbar__search--filled {
+  padding: 6px 8px 6px 12px;
+}
+
+.navbar__search-clear {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-raised);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.navbar__search-clear[hidden] {
+  display: none;
+}
+
+.search-panel {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  width: 480px;
+  max-width: min(480px, 70vw);
+  padding: 8px;
+  border: 1px solid var(--color-bg-raised);
+  border-radius: 16px;
+  background: var(--color-bg-page);
+  box-shadow:
+    0 20px 48px -8px rgb(0 0 0 / 0.2),
+    0 2px 6px rgb(0 0 0 / 0.2);
+}
+
+.search-panel[hidden] {
+  display: none;
+}
+
+.search-panel__message {
+  margin: 0;
+  padding: 12px 8px;
+  color: var(--color-text-secondary);
+}
+
+.search-panel__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.search-hit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 10px;
+  color: inherit;
+}
+
+.search-hit:hover,
+.search-hit:focus-visible {
+  background: var(--color-tint-white);
+}
+
+.search-hit__poster {
+  display: block;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--color-bg-card);
+}
+
+.search-hit__poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.search-hit__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.search-hit__copy .text-label-m {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .navbar__search-input::-webkit-search-cancel-button {

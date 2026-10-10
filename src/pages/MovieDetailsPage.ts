@@ -261,7 +261,6 @@ export const MovieDetailsPage: Page = ({ params, signal }) => {
         }
 
         requireAuth(() => openBooking({ movie, session: chosen, signal }));
-        if (!appState.get().user) showNotice("Log in to buy tickets.");
       },
       { signal },
     );

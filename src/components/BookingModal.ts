@@ -281,7 +281,6 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
 
   function checkoutSummary(): SafeHtml {
     const held = selection.map((seat) => ({ ticketType: { name: typeBySlug(seat.ticketType)?.name ?? seat.ticketType } }));
-    const ready = checkoutErrors().length === 0;
     return html`
       <aside class="booking__summary">
         <h3 class="text-button">Summary</h3>
@@ -297,7 +296,7 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
           <span class="text-label-s">SUBTOTAL</span>
           <span class="text-h1">${formatPrice(subtotal())}</span>
         </div>
-        <button class="button button--primary booking__next" type="button" data-action="pay" ${(!ready || paying) && "disabled"}>
+        <button class="button button--primary booking__next" type="button" data-action="pay" ${(!contactReady() || paying) && "disabled"}>
           ${paying ? "Processing…" : "Pay: Complete order"}
         </button>
       </aside>
@@ -364,7 +363,8 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
               ? html`
                   <aside class="booking__summary">
                     <h3 class="text-button">Your seats · Max ${maxSeats}</h3>
-                    <p class="booking__hint text-body-s">Pick up to ${maxSeats} seats from the map. Each seat can carry its own ticket type.</p>
+                    ${selection.length === 0 &&
+                    html`<p class="booking__hint text-body-s">Pick up to ${maxSeats} seats from the map. Each seat can carry its own ticket type.</p>`}
                     ${picksMarkup()}
                     <div class="booking__total">
                       <span class="text-label-s">SUBTOTAL</span>
@@ -387,19 +387,34 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
     `;
   }
 
-  function checkoutErrors(): string[] {
+  const FIELD_MESSAGES: Record<string, string> = {
+    fullName: "Name must be at least 3 characters",
+    email: "Enter a valid email",
+    mobileNumber: "Enter a Georgian mobile number",
+    cardNumber: "Card number must be 16 digits",
+    expiry: "Use a future MM/YY date",
+    cvv: "CVV must be 3 digits",
+  };
+
+  function contactProblems(): string[] {
     const problems: string[] = [];
-    const name = fields.fullName.trim();
     const mobile = fields.mobileNumber.replace(/\s+/g, "");
-    const card = fields.cardNumber.replace(/\s+/g, "");
-    if (name.length < 3) problems.push("fullName");
+    if (fields.fullName.trim().length < 3) problems.push("fullName");
     if (!EMAIL_PATTERN.test(fields.email.trim())) problems.push("email");
     if (!/^5\d{8}$/.test(mobile)) problems.push("mobileNumber");
+    return problems;
+  }
+
+  function checkoutErrors(): string[] {
+    const card = fields.cardNumber.replace(/\s+/g, "");
+    const problems = contactProblems();
     if (!/^\d{16}$/.test(card)) problems.push("cardNumber");
     if (!expiryValid(fields.expiry.trim())) problems.push("expiry");
     if (!/^\d{3}$/.test(fields.cvv.trim())) problems.push("cvv");
     return problems;
   }
+
+  const contactReady = () => contactProblems().length === 0;
 
   const toggleSeat = (id: number, code: string) => {
     alert = "";
@@ -448,9 +463,17 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
   };
 
   const pay = async () => {
-    if (!holdId || paying || checkoutErrors().length > 0) return;
-    paying = true;
+    if (!holdId || paying) return;
+    const problems = checkoutErrors();
     Object.keys(fieldErrors).forEach((key) => delete fieldErrors[key]);
+    if (problems.length > 0) {
+      problems.forEach((key) => {
+        fieldErrors[key] = FIELD_MESSAGES[key];
+      });
+      render();
+      return;
+    }
+    paying = true;
     render();
     try {
       order = await createOrder({
@@ -534,7 +557,7 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
     delete fieldErrors[input.name];
     if (input.value !== value) input.value = value;
     const next = root.querySelector<HTMLButtonElement>("[data-action='pay']");
-    if (next) next.disabled = checkoutErrors().length > 0 || paying;
+    if (next) next.disabled = !contactReady() || paying;
     const check = input.parentElement?.querySelector(".booking__check");
     const valid = value.trim().length > 0 && !checkoutErrors().includes(input.name);
     if (valid && !check) input.insertAdjacentHTML("afterend", icon("check", "booking__check icon").value);

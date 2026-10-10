@@ -9,6 +9,10 @@ const PATHS = {
     size: 34,
     body: `<path d="M12.75 8.5s8.5 6.26 8.5 8.5-8.5 8.5-8.5 8.5" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>`,
   },
+  upload: {
+    size: 16,
+    body: `<path d="M8 11.5V3.5M8 3.5L5.25 6.25M8 3.5L10.75 6.25M3.25 13.25H12.75" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`,
+  },
   search: {
     size: 14,
     body: `<path d="M9.21867 9.21867L12.25 12.25M10.5 6.125C10.5 8.54125 8.54125 10.5 6.125 10.5C3.70875 10.5 1.75 8.54125 1.75 6.125C1.75 3.70875 3.70875 1.75 6.125 1.75C8.54125 1.75 10.5 3.70875 10.5 6.125Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>`,

@@ -1,7 +1,11 @@
+import { searchMovies } from "../api/moviesApi";
 import { getCurrentPath, onRouteChange } from "../router/router";
 import { appState } from "../state/appState";
 import type { User } from "../types/auth";
+import type { Movie } from "../types/movie";
+import { formatDayMonth } from "../utils/date";
 import { html, toElement, type SafeHtml } from "../utils/dom";
+import { formatGenreRuntime } from "../utils/format";
 import { icon } from "./icons";
 
 export interface NavbarOptions {
@@ -130,17 +134,23 @@ function navbarMarkup(user: User | null, path: string): SafeHtml {
         >Sessions</a>
       </nav>
       <div class="navbar__right">
-        <form class="navbar__search" role="search">
-          ${icon("search", "navbar__search-icon")}
-          <input
-            class="navbar__search-input text-body-m"
-            type="search"
-            name="q"
-            placeholder="Search films and live events"
-            aria-label="Search films and live events"
-            autocomplete="off"
-          />
-        </form>
+        <div class="navbar__search-wrap">
+          <form class="navbar__search" role="search">
+            ${icon("search", "navbar__search-icon")}
+            <input
+              class="navbar__search-input text-body-m"
+              type="search"
+              name="q"
+              placeholder="Search films and live events"
+              aria-label="Search films and live events"
+              aria-controls="search-panel"
+              aria-expanded="false"
+              autocomplete="off"
+            />
+            <button class="navbar__search-clear" type="button" data-action="clear-search" hidden aria-label="Clear search">×</button>
+          </form>
+          <div class="search-panel" id="search-panel" hidden></div>
+        </div>
         ${user ? userMarkup(user) : guestMarkup()}
       </div>
     </div>
@@ -173,8 +183,18 @@ export function Navbar(options: NavbarOptions = {}): HTMLElement {
     const target = event.target as Element;
     const action = target.closest<HTMLElement>("[data-action]")?.dataset.action;
 
-    if (action === "toggle-menu") setMenuOpen(!isMenuOpen());
-    else if (action === "log-in") options.onLogIn?.();
+    if (action === "toggle-menu") {
+      setSearchOpen(false);
+      setMenuOpen(!isMenuOpen());
+    } else if (action === "clear-search") {
+      const input = searchInput();
+      if (!input) return;
+      input.value = "";
+      input.focus();
+      header.querySelector<HTMLButtonElement>(".navbar__search-clear")?.setAttribute("hidden", "");
+      searchForm()?.classList.remove("navbar__search--filled");
+      runSearch("");
+    } else if (action === "log-in") options.onLogIn?.();
     else if (action === "sign-up") options.onSignUp?.();
     else if (action === "log-out") {
       setMenuOpen(false);
@@ -182,19 +202,132 @@ export function Navbar(options: NavbarOptions = {}): HTMLElement {
     } else if (target.closest(".profile-menu__item")) setMenuOpen(false);
   });
 
+  let searchTimer = 0;
+  let searchRequest = 0;
+  let searchController: AbortController | null = null;
+
+  const searchInput = () => header.querySelector<HTMLInputElement>(".navbar__search-input");
+  const searchPanel = () => header.querySelector<HTMLElement>(".search-panel");
+  const searchForm = () => header.querySelector<HTMLFormElement>(".navbar__search");
+
+  const setSearchOpen = (open: boolean) => {
+    const input = searchInput();
+    const panel = searchPanel();
+    const form = searchForm();
+    if (!input || !panel || !form) return;
+    input.setAttribute("aria-expanded", String(open));
+    panel.hidden = !open;
+    form.classList.toggle("navbar__search--open", open);
+  };
+
+  const paintSearch = (markup: SafeHtml) => {
+    const panel = searchPanel();
+    if (!panel) return;
+    panel.innerHTML = markup.value;
+    setSearchOpen(true);
+  };
+
+  const searchMessage = (text: string) => paintSearch(html`<p class="search-panel__message text-body-s">${text}</p>`);
+
+  const searchMeta = (movie: Movie): string => {
+    if (movie.isComingSoon) return `In cinemas ${formatDayMonth(movie.releaseDate, "long")}`;
+    return formatGenreRuntime(movie.genres[0]?.name, movie.runtimeMinutes);
+  };
+
+  const paintResults = (movies: Movie[]) => {
+    if (movies.length === 0) {
+      searchMessage("No results found");
+      return;
+    }
+
+    paintSearch(html`
+      <div class="search-panel__list">
+        ${movies.map(
+          (movie) => html`
+            <a class="search-hit" href="/movies/${encodeURIComponent(movie.slug)}">
+              <span class="search-hit__poster">
+                ${movie.posterUrl ? html`<img src="${movie.posterUrl}" alt="" />` : ""}
+              </span>
+              <span class="search-hit__copy">
+                <span class="text-label-m">${movie.title}</span>
+                <span class="text-body-s text-secondary">${searchMeta(movie)}</span>
+              </span>
+            </a>
+          `,
+        )}
+      </div>
+    `);
+  };
+
+  const runSearch = (query: string) => {
+    window.clearTimeout(searchTimer);
+    searchController?.abort();
+
+    if (!query) {
+      searchMessage("Type a title to see films and live events");
+      return;
+    }
+
+    searchMessage("Searching…");
+    const request = ++searchRequest;
+    searchTimer = window.setTimeout(async () => {
+      const controller = new AbortController();
+      searchController = controller;
+      try {
+        const movies = await searchMovies(query, controller.signal);
+        if (request !== searchRequest) return;
+        paintResults(movies);
+      } catch (error) {
+        if (controller.signal.aborted || request !== searchRequest) return;
+        console.error("Search failed", error);
+        searchMessage("Search could not be loaded.");
+      }
+    }, 300);
+  };
+
+  header.addEventListener("focusin", (event) => {
+    if (!(event.target as Element).closest(".navbar__search-input")) return;
+    setMenuOpen(false);
+    const query = searchInput()?.value.trim() ?? "";
+    if (!query) searchMessage("Type a title to see films and live events");
+    else setSearchOpen(true);
+  });
+
+  header.addEventListener("input", (event) => {
+    const input = event.target as HTMLInputElement;
+    if (!input.classList.contains("navbar__search-input")) return;
+    const clear = header.querySelector<HTMLButtonElement>(".navbar__search-clear");
+    const form = searchForm();
+    const query = input.value.trim();
+    if (clear) clear.hidden = query.length === 0;
+    form?.classList.toggle("navbar__search--filled", query.length > 0);
+    options.onSearch?.(query);
+    runSearch(query);
+  });
+
   header.addEventListener("submit", (event) => {
     event.preventDefault();
-    const input = header.querySelector<HTMLInputElement>(".navbar__search-input");
-    const query = input?.value.trim();
-    if (query) options.onSearch?.(query);
+    const query = searchInput()?.value.trim() ?? "";
+    runSearch(query);
+  });
+
+  header.addEventListener("mousedown", (event) => {
+    if ((event.target as Element).closest(".search-panel")) event.preventDefault();
   });
 
   document.addEventListener("click", (event) => {
-    if (isMenuOpen() && !(event.target as Element).closest(".navbar__user")) setMenuOpen(false);
+    const target = event.target as Element;
+    if (isMenuOpen() && !target.closest(".navbar__user")) setMenuOpen(false);
+    if (!searchPanel()?.hidden && !target.closest(".navbar__search-wrap")) setSearchOpen(false);
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || !isMenuOpen()) return;
+    if (event.key !== "Escape") return;
+    if (!searchPanel()?.hidden) {
+      setSearchOpen(false);
+      searchInput()?.blur();
+    }
+    if (!isMenuOpen()) return;
     setMenuOpen(false);
     getToggle()?.focus();
   });
@@ -215,6 +348,7 @@ export function Navbar(options: NavbarOptions = {}): HTMLElement {
   onRouteChange((path) => {
     updateActiveLink(path);
     setMenuOpen(false);
+    setSearchOpen(false);
   });
   render();
 

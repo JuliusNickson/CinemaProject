@@ -3,6 +3,7 @@ import { updateProfile } from "../api/profileApi";
 import { getFilterOptions } from "../api/sessionsApi";
 import type { Page } from "../router/router";
 import { appState, setUser } from "../state/appState";
+import { requireAuth } from "../state/requireAuth";
 import type { Venue } from "../types/venue";
 import { html, toElement, type SafeHtml } from "../utils/dom";
 
@@ -111,6 +112,9 @@ export const ProfilePage: Page = ({ signal }) => {
     const current = appState.get().user;
     if (!current) {
       renderGuestState();
+      requireAuth(() => {
+        void renderProfile();
+      });
       return;
     }
 

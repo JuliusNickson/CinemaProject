@@ -4,6 +4,7 @@ dist
 .env.local
 .env.*.local
 /Info.md
+/design.md  
 *.log
 .DS_Store
 ._*
