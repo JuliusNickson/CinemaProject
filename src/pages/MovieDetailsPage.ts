@@ -2,7 +2,7 @@ import { getMovie, getMovieSessions } from "../api/moviesApi";
 import { AgeBadge, Badge } from "../components/Badge";
 import { openBooking } from "../components/BookingModal";
 import { icon } from "../components/icons";
-import type { Page } from "../router/router";
+import { navigate, type Page } from "../router/router";
 import { appState } from "../state/appState";
 import { requireAuth } from "../state/requireAuth";
 import type { MovieDetail } from "../types/movie";
@@ -30,10 +30,10 @@ function hallGroups(sessions: Session[]): [string, Session[]][] {
   return [...groups];
 }
 
-function showtimeMarkup(session: Session, blocked: boolean): SafeHtml {
+function showtimeMarkup(session: Session, blocked: boolean, ratingCode: string): SafeHtml {
   const disabled = blocked || session.isSoldOut;
   const reason = blocked
-    ? `This film is rated ${session.movie.ageRating.code}. You cannot buy tickets for it with this account.`
+    ? `This film is rated ${ratingCode}. You cannot buy tickets for it with this account.`
     : session.isSoldOut
       ? "Sold out"
       : "Select seats";
@@ -56,7 +56,7 @@ function showtimeMarkup(session: Session, blocked: boolean): SafeHtml {
   `;
 }
 
-function sessionsMarkup(groups: VenueSessionsGroup[], blocked: boolean): SafeHtml {
+function sessionsMarkup(groups: VenueSessionsGroup[], blocked: boolean, ratingCode: string): SafeHtml {
   if (groups.length === 0 || groups.every((group) => group.sessions.length === 0)) {
     return html`<p class="movie-sessions__empty">No sessions are available for this date.</p>`;
   }
@@ -70,7 +70,7 @@ function sessionsMarkup(groups: VenueSessionsGroup[], blocked: boolean): SafeHtm
             ([hall, sessions]) => html`
               <div class="hall-card">
                 <p class="text-label-s">${hall}</p>
-                <div class="hall-card__grid">${sessions.map((session) => showtimeMarkup(session, blocked))}</div>
+                <div class="hall-card__grid">${sessions.map((session) => showtimeMarkup(session, blocked, ratingCode))}</div>
               </div>
             `,
           )}
@@ -172,7 +172,7 @@ function pageMarkup(movie: MovieDetail, dates: string[], selected: string, total
   `;
 }
 
-export const MovieDetailsPage: Page = ({ params, signal }) => {
+export const MovieDetailsPage: Page = ({ params, query, signal }) => {
   const page = toElement(html`<article class="movie-page"><p class="movie-page__status">Loading film…</p></article>`);
 
   const load = async () => {
@@ -211,22 +211,46 @@ export const MovieDetailsPage: Page = ({ params, signal }) => {
     results.forEach(([date, groups]) => byDate.set(date, groups));
 
     const totalSessions = results.reduce((sum, [, groups]) => sum + groups.reduce((count, group) => count + group.sessions.length, 0), 0);
-    let selected = dates[0];
     const sessionsFor = (date: string) => byDate.get(date) ?? [];
     const sessionById = (id: number) =>
       [...byDate.values()].flatMap((groups) => groups.flatMap((group) => group.sessions)).find((item) => item.id === id);
 
+    const sessionParam = query.get("session");
+    const requestedId = sessionParam ? Number(sessionParam) : Number.NaN;
+    const requested = Number.isInteger(requestedId) ? sessionById(requestedId) : undefined;
+    let selected = requested && dates.includes(requested.date) ? requested.date : dates[0];
+
     const paintSessions = () => {
       const slot = page.querySelector<HTMLElement>("[data-slot='sessions']");
       if (!slot) return;
-      slot.innerHTML = sessionsMarkup(sessionsFor(selected), ageBlocked(movie)).value;
+      slot.innerHTML = sessionsMarkup(sessionsFor(selected), ageBlocked(movie), movie.ageRating.code).value;
     };
 
     const showNotice = (message: string) => {
       const notice = page.querySelector<HTMLElement>("[data-notice]");
       if (!notice) return;
       notice.hidden = false;
-      notice.innerHTML = message;
+      notice.textContent = message;
+    };
+
+    const requestBooking = (chosen: Session) => {
+      if (chosen.isSoldOut || signal.aborted) return;
+
+      const openIfAllowed = () => {
+        if (signal.aborted) return;
+        const user = appState.get().user;
+        if (!user?.profileComplete) {
+          navigate("/profile");
+          return;
+        }
+        if (ageBlocked(movie)) {
+          showNotice(`This film is rated ${movie.ageRating.code}. You cannot buy tickets for it with this account.`);
+          return;
+        }
+        openBooking({ movie, session: chosen, signal });
+      };
+
+      requireAuth(openIfAllowed);
     };
 
     page.innerHTML = pageMarkup(movie, dates, selected, totalSessions).value;
@@ -253,17 +277,12 @@ export const MovieDetailsPage: Page = ({ params, signal }) => {
         if (!sessionButton?.dataset.session || sessionButton.disabled) return;
         const chosen = sessionById(Number(sessionButton.dataset.session));
         if (!chosen) return;
-
-        const user = appState.get().user;
-        if (user && !user.profileComplete) {
-          showNotice(`Please complete your profile to enable booking. <a href="/profile">Go to profile</a>`);
-          return;
-        }
-
-        requireAuth(() => openBooking({ movie, session: chosen, signal }));
+        requestBooking(chosen);
       },
       { signal },
     );
+
+    if (requested && !requested.isSoldOut) requestBooking(requested);
   };
 
   void load();

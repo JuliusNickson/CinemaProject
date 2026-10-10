@@ -143,6 +143,9 @@ export const ProfilePage: Page = ({ signal }) => {
           </span>
         </div>
 
+        ${!current.profileComplete &&
+        html`<p class="profile-page__banner" role="status">Please complete your profile to enable booking.</p>`}
+
         <form class="profile-form" novalidate>
           <div class="profile-form__grid">
             ${fieldMarkup({ id: "fullName", label: "Full name", value: values.fullName, required: true, error: errors.fullName })}

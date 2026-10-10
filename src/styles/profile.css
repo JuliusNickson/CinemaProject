@@ -49,6 +49,14 @@
   color: var(--color-warning);
 }
 
+.profile-page__banner {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: rgb(226 126 4 / 0.12);
+  color: var(--color-warning);
+}
+
 .profile-form {
   display: flex;
   flex-direction: column;
