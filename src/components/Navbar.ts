@@ -7,6 +7,7 @@ import type { User } from "../types/auth";
 import type { Movie } from "../types/movie";
 import { html, toElement, type SafeHtml } from "../utils/dom";
 import { formatPrice } from "../utils/format";
+import clearIcon from "../assets/Clear.png";
 import popcornIcon from "../assets/popcorn.png";
 import { icon } from "./icons";
 
@@ -149,7 +150,9 @@ function navbarMarkup(user: User | null, path: string): SafeHtml {
               aria-expanded="false"
               autocomplete="off"
             />
-            <button class="navbar__search-clear" type="button" data-action="clear-search" hidden aria-label="Clear search">×</button>
+            <button class="navbar__search-clear" type="button" data-action="clear-search" hidden aria-label="Clear search">
+              <img src="${clearIcon}" alt="" />
+            </button>
           </form>
           <div class="search-panel" id="search-panel" hidden></div>
         </div>

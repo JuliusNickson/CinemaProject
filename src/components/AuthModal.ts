@@ -14,6 +14,10 @@ export interface OpenAuthOptions {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const TOO_SHORT = "At least 3 characters";
+const PASSWORDS_MISMATCH = "Passwords do not match";
+const EMAIL_INVALID = "Enter a valid email";
+const AVATAR_INVALID = "Use a JPG, PNG or WebP image";
 
 let pendingAction: (() => void) | null = null;
 
@@ -29,6 +33,7 @@ export function openAuth({ mode = "login", onSuccess }: OpenAuthOptions = {}): v
   let currentMode: AuthMode = mode;
   const fields = { username: "", email: "", password: "", password_confirmation: "" };
   let errors: Record<string, string> = {};
+  const touched = new Set<string>();
   let formError = "";
   let submitting = false;
   let avatar: File | null = null;
@@ -51,20 +56,27 @@ export function openAuth({ mode = "login", onSuccess }: OpenAuthOptions = {}): v
     if (event.key === "Escape") finish(false);
   };
 
+  const clientMessage = (name: string): string => {
+    if (name === "email") return EMAIL_PATTERN.test(fields.email.trim()) ? "" : EMAIL_INVALID;
+    if (name === "password") return fields.password.length >= 3 ? "" : TOO_SHORT;
+    if (currentMode !== "signup") return "";
+    if (name === "username") return fields.username.trim().length >= 3 ? "" : TOO_SHORT;
+    if (name === "password_confirmation") return fields.password_confirmation === fields.password ? "" : PASSWORDS_MISMATCH;
+    if (name === "avatar") return avatar && !AVATAR_TYPES.includes(avatar.type) ? AVATAR_INVALID : "";
+    return "";
+  };
+
+  const shownMessage = (name: string): string => {
+    if (errors[name]) return errors[name];
+    return touched.has(name) ? clientMessage(name) : "";
+  };
+
   const validate = (): boolean => {
     errors = {};
-    const email = fields.email.trim();
-    const password = fields.password;
-
-    if (!EMAIL_PATTERN.test(email)) errors.email = "Enter a valid email";
-    if (password.length < 3) errors.password = "Password must be at least 3 characters";
-
-    if (currentMode === "signup") {
-      if (fields.username.trim().length < 3) errors.username = "Username must be at least 3 characters";
-      if (fields.password_confirmation !== password) errors.password_confirmation = "Passwords do not match";
-      if (avatar && !AVATAR_TYPES.includes(avatar.type)) errors.avatar = "Use a JPG, PNG or WebP image";
+    for (const name of currentMode === "login" ? ["email", "password"] : ["username", "email", "password", "password_confirmation", "avatar"]) {
+      const message = clientMessage(name);
+      if (message) errors[name] = message;
     }
-
     return Object.keys(errors).length === 0;
   };
 
@@ -81,12 +93,18 @@ export function openAuth({ mode = "login", onSuccess }: OpenAuthOptions = {}): v
   };
 
   function fieldMarkup(name: keyof typeof fields, label: string, type: string, placeholder: string): SafeHtml {
-    const error = errors[name];
+    const error = shownMessage(name);
+    const valid = fields[name].trim().length > 0 && !clientMessage(name) && !errors[name];
     return html`
-      <label class="auth__field">
+      <label class="auth__field ${error && "auth__field--invalid"}" data-field="${name}">
         <span class="auth__label text-label-s">${label}</span>
-        <input name="${name}" type="${type}" value="${fields[name]}" placeholder="${placeholder}" autocomplete="off" />
-        ${error && html`<span class="auth__error text-body-s">${error}</span>`}
+        <span class="auth__control">
+          <input name="${name}" type="${type}" value="${fields[name]}" placeholder="${placeholder}" autocomplete="off" />
+          ${error
+            ? html`<span class="auth__status auth__status--error">${icon("info")}</span>`
+            : valid && html`<span class="auth__status auth__status--ok">${icon("check")}</span>`}
+        </span>
+        <span class="auth__error text-body-s">${error}</span>
       </label>
     `;
   }
@@ -123,7 +141,7 @@ export function openAuth({ mode = "login", onSuccess }: OpenAuthOptions = {}): v
                     <span class="auth__avatar-copy">
                       <span class="text-label-m">Upload avatar (optional)</span>
                       <span class="text-body-s text-secondary">JPG, PNG or WEBP</span>
-                      ${errors.avatar && html`<span class="auth__error text-body-s">${errors.avatar}</span>`}
+                      ${shownMessage("avatar") && html`<span class="auth__error text-body-s">${shownMessage("avatar")}</span>`}
                     </span>
                     <input name="avatar" type="file" accept="image/jpeg,image/png,image/webp" />
                   </label>
@@ -151,6 +169,7 @@ export function openAuth({ mode = "login", onSuccess }: OpenAuthOptions = {}): v
   overlay.addEventListener("auth-mode", (event) => {
     currentMode = (event as CustomEvent<AuthMode>).detail;
     errors = {};
+    touched.clear();
     formError = "";
     render();
   });
@@ -164,16 +183,45 @@ export function openAuth({ mode = "login", onSuccess }: OpenAuthOptions = {}): v
     if (target.closest("[data-action='switch']")) {
       currentMode = currentMode === "login" ? "signup" : "login";
       errors = {};
+      touched.clear();
       formError = "";
       render();
     }
   });
 
+  const paintField = (name: keyof typeof fields) => {
+    const field = overlay.querySelector<HTMLElement>(`[data-field="${name}"]`);
+    const input = field?.querySelector("input");
+    if (!field || !input) return;
+    const error = shownMessage(name);
+    const valid = fields[name].trim().length > 0 && !clientMessage(name) && !errors[name];
+    field.classList.toggle("auth__field--invalid", Boolean(error));
+    const errorNode = field.querySelector(".auth__error");
+    if (errorNode) errorNode.textContent = error;
+    field.querySelector(".auth__status")?.remove();
+    if (error) input.insertAdjacentHTML("afterend", icon("info", "auth__status auth__status--error icon").value);
+    else if (valid) input.insertAdjacentHTML("afterend", icon("check", "auth__status auth__status--ok icon").value);
+  };
+
   overlay.addEventListener("input", (event) => {
     const input = event.target as HTMLInputElement;
-    if (input.name in fields) fields[input.name as keyof typeof fields] = input.value;
+    if (!(input.name in fields)) return;
+    const name = input.name as keyof typeof fields;
+    fields[name] = input.value;
+    touched.add(name);
+    delete errors[name];
+    paintField(name);
+    if (name === "password") paintField("password_confirmation");
     const submit = overlay.querySelector<HTMLButtonElement>(".auth__submit");
     if (submit) submit.disabled = !isReady() || submitting;
+  });
+
+  overlay.addEventListener("focusout", (event) => {
+    const input = event.target as HTMLInputElement;
+    if (!(input.name in fields)) return;
+    const name = input.name as keyof typeof fields;
+    touched.add(name);
+    paintField(name);
   });
 
   overlay.addEventListener("change", (event) => {
@@ -182,7 +230,8 @@ export function openAuth({ mode = "login", onSuccess }: OpenAuthOptions = {}): v
     avatar = input.files[0] ?? null;
     if (avatarUrl) URL.revokeObjectURL(avatarUrl);
     avatarUrl = avatar ? URL.createObjectURL(avatar) : null;
-    errors.avatar = "";
+    touched.add("avatar");
+    delete errors.avatar;
     render();
   });
 
