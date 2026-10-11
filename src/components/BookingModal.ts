@@ -112,15 +112,17 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
 
   const paintTimer = () => {
     const node = root.querySelector<HTMLElement>("[data-timer]");
-    if (node) node.textContent = holdId ? formatClock(secondsLeft()) : "8:00";
+    if (node) node.textContent = formatClock(secondsLeft());
   };
 
   const expireHold = () => {
+    const expired = holdId;
     holdId = null;
     expiresAt = 0;
     selection = [];
     step = "seats";
     alert = "Your hold time expired. Please re-select your seats.";
+    if (expired) void releaseHold(expired).catch(() => undefined);
     void loadMap();
   };
 
@@ -129,7 +131,19 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
     paintTimer();
   };
 
-  const loadMap = async () => {
+  const markSold = (codes: string[]) => {
+    if (!seatMap || codes.length === 0) return;
+    const lost = new Set(codes);
+    seatMap.sections.forEach((section) => {
+      section.rows.forEach((row) => {
+        row.seats.forEach((seat) => {
+          if (lost.has(seat.code)) seat.state = "sold";
+        });
+      });
+    });
+  };
+
+  const loadMap = async (paint = true) => {
     loadError = "";
     try {
       seatMap = await getSeatMap(session.id, signal);
@@ -149,8 +163,17 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
       console.error("Seat map could not be loaded", error);
       loadError = "The seat map could not be loaded.";
     }
-    if (!signal.aborted) render();
+    if (!signal.aborted && paint) render();
   };
+
+  /** Child tickets on a 16+ or 18+ film block checkout and name the seat. */
+  const seatRuleViolations = (): string[] =>
+    selection.flatMap((seat) => {
+      const type = typeBySlug(seat.ticketType);
+      if (!type || !blocked(type)) return [];
+      const reason = type.note ?? `${type.name} tickets are not available for this film.`;
+      return [`Seat ${seat.code}: ${reason}`];
+    });
 
   function seatButton(seat: Seat): SafeHtml {
     const selected = selection.some((item) => item.seatId === seat.id);
@@ -211,7 +234,7 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
         return html`
           <article class="booking-pick">
             <div class="booking-pick__top">
-              <span class="text-label-m">Seat <strong>${seat.code}</strong></span>
+              <span class="text-label-m">Seat <strong>${seat.code}</strong> · ${type?.name ?? "Adult"}</span>
               <span class="booking-pick__price text-label-m">${formatPrice(priceOf(seat.ticketType))}</span>
               <button class="booking-pick__remove" type="button" data-remove="${seat.seatId}" aria-label="Remove seat ${seat.code}">×</button>
             </div>
@@ -297,7 +320,7 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
           <span class="text-h1">${formatPrice(subtotal())}</span>
         </div>
         <button class="button button--primary booking__next" type="button" data-action="pay" ${(!contactReady() || paying) && "disabled"}>
-          ${paying ? "Processing…" : "Pay: Complete order"}
+          ${paying ? "Processing…" : "Pay & Complete Order"}
         </button>
       </aside>
     `;
@@ -327,8 +350,8 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
           <div class="booking__ticket-row text-body-s"><span>TOTAL PAID</span><strong class="text-h3">${formatPrice(order.totalPrice)}</strong></div>
         </div>
         <div class="booking__actions">
-          <a class="button button--primary" href="/profile?tab=tickets">View my tickets</a>
-          <a class="button button--tint" href="/">Back to home</a>
+          <a class="button button--primary" href="/profile?tab=tickets">My Tickets</a>
+          <button class="button button--tint" type="button" data-action="close">Close</button>
         </div>
       </div>
     `;
@@ -346,10 +369,13 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
               <p class="booking__meta text-body-s">${sessionLine(session, true)}</p>
             </div>
             <div class="booking__header-side">
-              <div class="booking__timer">
-                <span class="booking__timer-label text-label-s">SEATS HELD</span>
-                <span class="text-button" data-timer>8:00</span>
-              </div>
+              ${holdId &&
+              html`
+                <div class="booking__timer">
+                  <span class="booking__timer-label text-label-s">SEATS HELD</span>
+                  <span class="text-button" data-timer>${formatClock(secondsLeft())}</span>
+                </div>
+              `}
               <button class="booking__close" type="button" data-action="close" aria-label="Close">×</button>
             </div>
           </header>
@@ -370,7 +396,14 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
                       <span class="text-label-s">SUBTOTAL</span>
                       <span class="text-h1">${formatPrice(subtotal())}</span>
                     </div>
-                    <button class="button button--primary booking__next" type="button" data-action="hold" ${(selection.length === 0 || holding) && "disabled"}>
+                    ${seatRuleViolations().length > 0 &&
+                    html`<p class="booking__alert text-body-s">${seatRuleViolations().join(" ")}</p>`}
+                    <button
+                      class="button button--primary booking__next"
+                      type="button"
+                      data-action="hold"
+                      ${(selection.length === 0 || holding || seatRuleViolations().length > 0) && "disabled"}
+                    >
                       ${holding ? "Holding seats…" : "Next: Checkout"}
                     </button>
                   </aside>
@@ -429,7 +462,19 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
   };
 
   const hold = async () => {
-    if (selection.length === 0 || holding) return;
+    if (selection.length === 0 || holding || seatRuleViolations().length > 0) return;
+    const currentUser = appState.get().user;
+    if (!currentUser?.profileComplete) {
+      alert = "Please complete your profile to enable booking.";
+      render();
+      return;
+    }
+    if (currentUser.age !== null && movie.ageRating.minAge > currentUser.age) {
+      alert = `This film is rated ${movie.ageRating.code}. You cannot buy tickets for it with this account.`;
+      render();
+      return;
+    }
+
     holding = true;
     alert = "";
     render();
@@ -451,7 +496,8 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
         const lost = error.contested ?? [];
         alert = lost.length > 0 ? `These seats were just taken: ${lost.join(", ")}.` : "Some seats were just taken.";
         selection = selection.filter((seat) => !lost.includes(seat.code));
-        await loadMap();
+        await loadMap(false);
+        markSold(lost);
         return;
       }
       console.error("Could not hold seats", error);
@@ -489,14 +535,26 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
       step = "confirmed";
     } catch (error) {
       if (error instanceof ApiError && error.isValidationError && error.errors) {
+        const fieldsByKey: Record<string, keyof typeof fields> = {
+          fullName: "fullName",
+          full_name: "fullName",
+          email: "email",
+          mobileNumber: "mobileNumber",
+          mobile_number: "mobileNumber",
+          cardNumber: "cardNumber",
+          card_number: "cardNumber",
+          expiry: "expiry",
+          cvv: "cvv",
+        };
         Object.entries(error.errors).forEach(([key, messages]) => {
-          fieldErrors[key] = messages[0] ?? "Check this field";
+          const field = fieldsByKey[key];
+          const message = messages[0] ?? "Check this field";
+          if (field) fieldErrors[field] = message;
+          else alert = message;
         });
       } else if (error instanceof ApiError && error.isConflict) {
-        alert = error.message;
-        step = "seats";
-        await loadMap();
-        return;
+        alert = error.message || "That selection is no longer available.";
+        step = "checkout";
       } else {
         console.error("Payment failed", error);
         alert = error instanceof ApiError ? error.message : "Payment could not be completed.";
