@@ -296,6 +296,13 @@
   color: var(--color-text-secondary);
 }
 
+.movie-sessions__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
 .movie-facts {
   display: flex;
   flex-direction: column;

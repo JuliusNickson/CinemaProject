@@ -74,6 +74,15 @@ export class ApiError extends Error {
   }
 }
 
+/** Copy for a failed request. Server faults stay generic; other API messages are shown as returned. */
+export function failureText(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && (error.status >= 500 || error.isNetworkError)) {
+    return "Something went wrong. Please try again.";
+  }
+  if (error instanceof ApiError && error.message) return error.message;
+  return fallback;
+}
+
 // Query parameters and bodies
 
 type QueryScalar = string | number | boolean;

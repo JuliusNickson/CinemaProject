@@ -96,9 +96,19 @@ function render(): void {
     outlet.replaceChildren(page(context));
   } catch (error) {
     console.error(error);
-    const message = document.createElement("p");
-    message.className = "page-error";
-    message.textContent = "Something went wrong while loading this page.";
+    const message = document.createElement("div");
+    message.className = "page page--centered";
+    message.innerHTML =
+      `<h1 class="page__title">Something went wrong</h1><p>This page could not be loaded.</p>`;
+    const retry = document.createElement("button");
+    retry.className = "button button--primary";
+    retry.type = "button";
+    retry.textContent = "Try again";
+    retry.addEventListener("click", () => {
+      currentPath = "";
+      render();
+    });
+    message.append(retry);
     outlet.replaceChildren(message);
   }
 

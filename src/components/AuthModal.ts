@@ -1,6 +1,7 @@
 import { ApiError } from "../api/client";
 import { login, register } from "../api/authApi";
-import { setUser } from "../state/appState";
+import { getCurrentPath, navigate } from "../router/router";
+import { isLoggedIn, setUser } from "../state/appState";
 import { html, toElement, type SafeHtml } from "../utils/dom";
 import { icon } from "./icons";
 
@@ -43,6 +44,7 @@ export function openAuth({ mode = "login", onSuccess }: OpenAuthOptions = {}): v
     overlay.remove();
     document.removeEventListener("keydown", onKeydown);
     if (succeeded) action?.();
+    else if (!isLoggedIn() && getCurrentPath() === "/profile") navigate("/");
   };
 
   const onKeydown = (event: KeyboardEvent) => {

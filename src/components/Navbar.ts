@@ -1,6 +1,8 @@
+import { ApiError, failureText } from "../api/client";
 import { searchMovies } from "../api/moviesApi";
 import { getCurrentPath, onRouteChange } from "../router/router";
 import { appState } from "../state/appState";
+import { requireAuth } from "../state/requireAuth";
 import type { User } from "../types/auth";
 import type { Movie } from "../types/movie";
 import { html, toElement, type SafeHtml } from "../utils/dom";
@@ -306,8 +308,17 @@ export function Navbar(options: NavbarOptions = {}): HTMLElement {
         paintResults(movies, query);
       } catch (error) {
         if (controller.signal.aborted || request !== searchRequest) return;
+        if (error instanceof ApiError && error.isUnauthorized) {
+          requireAuth(() => runSearch(query));
+          return;
+        }
         console.error("Search failed", error);
-        paintSearch(html`<p class="search-panel__message text-body-s">Search could not be loaded.</p>`);
+        paintSearch(html`
+          <div class="search-panel__empty">
+            <p class="search-panel__title text-label-m">${failureText(error, "Search could not be loaded.")}</p>
+            <button class="button search-panel__browse" type="button" data-action="retry-search">Try again</button>
+          </div>
+        `);
       }
     }, 300);
   };
@@ -336,6 +347,12 @@ export function Navbar(options: NavbarOptions = {}): HTMLElement {
     event.preventDefault();
     const query = searchInput()?.value.trim() ?? "";
     runSearch(query);
+  });
+
+  header.addEventListener("click", (event) => {
+    if ((event.target as Element).closest("[data-action='retry-search']")) {
+      runSearch(searchInput()?.value.trim() ?? "");
+    }
   });
 
   header.addEventListener("mousedown", (event) => {

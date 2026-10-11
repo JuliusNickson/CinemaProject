@@ -10,7 +10,7 @@ import { MovieDetailsPage } from "./pages/MovieDetailsPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { SessionsPage } from "./pages/SessionsPage";
-import { startRouter } from "./router/router";
+import { getCurrentPath, navigate, startRouter } from "./router/router";
 import { bootstrap, setUser } from "./state/appState";
 import { setAuthPrompt } from "./state/requireAuth";
 import { html, toElement } from "./utils/dom";
@@ -22,6 +22,7 @@ async function handleLogOut(): Promise<void> {
     console.error("Logout request failed", error);
   } finally {
     setUser(null);
+    if (getCurrentPath() === "/profile") navigate("/");
   }
 }
 

@@ -1,3 +1,4 @@
+import { failureText } from "../api/client";
 import { getFilterOptions, getSessions } from "../api/sessionsApi";
 import { AgeBadge } from "../components/Badge";
 import { FilterSidebar } from "../components/FilterSidebar";
@@ -210,7 +211,7 @@ export const SessionsPage: Page = ({ signal, onQueryChange }) => {
       countSlot.textContent = "";
       paginationSlot.innerHTML = "";
       listSlot.innerHTML = messageMarkup(
-        "Sessions could not be loaded.",
+        failureText(error, "Sessions could not be loaded."),
         html`<button class="button button--tint" type="button" data-action="retry">Try again</button>`,
       ).value;
     } finally {
@@ -242,7 +243,7 @@ export const SessionsPage: Page = ({ signal, onQueryChange }) => {
         console.error("Filter options could not be loaded", error);
         sidebarSlot.innerHTML = "";
         listSlot.innerHTML = messageMarkup(
-          "Filters could not be loaded.",
+          failureText(error, "Filters could not be loaded."),
           html`<button class="button button--tint" type="button" data-action="restart">Try again</button>`,
         ).value;
         return;

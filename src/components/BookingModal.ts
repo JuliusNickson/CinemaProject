@@ -1,4 +1,4 @@
-import { ApiError } from "../api/client";
+import { ApiError, failureText } from "../api/client";
 import { forgetHold, getSeatMap, getSession, holdSeats, releaseHold, rememberHold } from "../api/sessionsApi";
 import { createOrder } from "../api/ticketsApi";
 import { navigate } from "../router/router";
@@ -174,7 +174,7 @@ export function openBooking({ movie, session, signal, resume }: BookingOptions):
     } catch (error) {
       if (signal.aborted) return;
       console.error("Seat map could not be loaded", error);
-      loadError = "The seat map could not be loaded.";
+      loadError = failureText(error, "The seat map could not be loaded.");
     }
     if (!signal.aborted && paint) render();
   };
@@ -211,7 +211,14 @@ export function openBooking({ movie, session, signal, resume }: BookingOptions):
   }
 
   function seatsMarkup(): SafeHtml {
-    if (loadError) return html`<p class="booking__alert">${loadError}</p>`;
+    if (loadError) {
+      return html`
+        <div class="booking__alert">
+          <p>${loadError}</p>
+          <button class="button button--tint" type="button" data-action="retry-map">Try again</button>
+        </div>
+      `;
+    }
     if (!seatMap) return html`<p class="booking__hint">Loading seats…</p>`;
 
     return html`
@@ -619,7 +626,8 @@ export function openBooking({ movie, session, signal, resume }: BookingOptions):
     const typeButton = target.closest<HTMLButtonElement>("[data-type]");
     const stepButton = target.closest<HTMLButtonElement>("[data-step]");
 
-    if (action === "close") close();
+    if (action === "retry-map") void loadMap();
+    else if (action === "close") close();
     else if (action === "hold") void hold();
     else if (action === "pay") void pay();
     else if (remove) {

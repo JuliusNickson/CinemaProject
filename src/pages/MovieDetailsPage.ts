@@ -1,4 +1,4 @@
-import { ApiError } from "../api/client";
+import { ApiError, failureText } from "../api/client";
 import { getMovie, getMovieSessions } from "../api/moviesApi";
 import { forgetHold, getHold, getSession, readHold } from "../api/sessionsApi";
 import { AgeBadge, Badge } from "../components/Badge";
@@ -116,7 +116,7 @@ function pageMarkup(movie: MovieDetail, dates: string[], selected: string, total
         <section class="movie-sessions" aria-labelledby="movie-sessions-title">
           <div class="movie-sessions__heading">
             <h2 class="text-h2" id="movie-sessions-title">Sessions</h2>
-            <p class="text-body-s text-secondary">${totalSessions} sessions over the next seven days</p>
+            <p class="text-body-s text-secondary" data-session-count>${totalSessions} sessions over the next seven days</p>
           </div>
           <p class="movie-page__notice" data-notice hidden></p>
           <div class="movie-dates" role="tablist" aria-label="Session dates">
@@ -199,10 +199,16 @@ export const MovieDetailsPage: Page = ({ params, query, signal }) => {
     } catch (error) {
       if (signal.aborted) return;
       console.error("Could not load movie details", error);
+      const missing = error instanceof ApiError && error.status === 404;
       page.innerHTML = html`
         <section class="page page--centered">
-          <h1 class="page__title">Film details</h1>
-          <p class="page__placeholder">The selected film could not be loaded right now.</p>
+          <h1 class="page__title">${missing ? "Film not found" : "Film details"}</h1>
+          <p class="page__placeholder">
+            ${missing ? "This film does not exist." : failureText(error, "The selected film could not be loaded right now.")}
+          </p>
+          ${missing
+            ? html`<a class="button button--primary" href="/">Back to home</a>`
+            : html`<button class="button button--primary" type="button" data-action="retry-film">Try again</button>`}
         </section>
       `.value;
       return;
@@ -215,20 +221,22 @@ export const MovieDetailsPage: Page = ({ params, query, signal }) => {
     const dates = upcomingIsoDates(DATE_COUNT);
     const bookableDates = dates.filter((date) => movie.availableDates.includes(date));
     const byDate = new Map<string, VenueSessionsGroup[]>();
-    const results = await Promise.all(
-      bookableDates.map(async (date) => {
-        try {
-          return [date, await getMovieSessions(movie.slug, date, signal)] as const;
-        } catch (error) {
-          console.error("Could not load movie sessions", error);
-          return [date, [] as VenueSessionsGroup[]] as const;
-        }
-      }),
-    );
+    const failedDates = new Set<string>();
+    const loadDate = async (date: string) => {
+      try {
+        byDate.set(date, await getMovieSessions(movie.slug, date, signal));
+        failedDates.delete(date);
+      } catch (error) {
+        if (signal.aborted) return;
+        console.error("Could not load movie sessions", error);
+        failedDates.add(date);
+        byDate.set(date, []);
+      }
+    };
+    await Promise.all(bookableDates.map(loadDate));
     if (signal.aborted) return;
-    results.forEach(([date, groups]) => byDate.set(date, groups));
 
-    const totalSessions = results.reduce((sum, [, groups]) => sum + groups.reduce((count, group) => count + group.sessions.length, 0), 0);
+    const totalSessions = [...byDate.values()].reduce((sum, groups) => sum + groups.reduce((count, group) => count + group.sessions.length, 0), 0);
     const sessionsFor = (date: string) => byDate.get(date) ?? [];
     const sessionById = (id: number) =>
       [...byDate.values()].flatMap((groups) => groups.flatMap((group) => group.sessions)).find((item) => item.id === id);
@@ -240,7 +248,24 @@ export const MovieDetailsPage: Page = ({ params, query, signal }) => {
 
     const paintSessions = () => {
       const slot = page.querySelector<HTMLElement>("[data-slot='sessions']");
+      const count = page.querySelector<HTMLElement>("[data-session-count]");
+      if (count) {
+        const total = [...byDate.values()].reduce(
+          (sum, groups) => sum + groups.reduce((sessions, group) => sessions + group.sessions.length, 0),
+          0,
+        );
+        count.textContent = `${total} sessions over the next seven days`;
+      }
       if (!slot) return;
+      if (failedDates.has(selected)) {
+        slot.innerHTML = html`
+          <div class="movie-sessions__empty">
+            <p>Sessions for this date could not be loaded.</p>
+            <button class="button button--tint" type="button" data-action="retry-sessions">Try again</button>
+          </div>
+        `.value;
+        return;
+      }
       slot.innerHTML = sessionsMarkup(sessionsFor(selected), ageBlocked(movie), movie.ageRating.code).value;
     };
 
@@ -280,6 +305,13 @@ export const MovieDetailsPage: Page = ({ params, query, signal }) => {
         const target = event.target as Element;
         const dateButton = target.closest<HTMLButtonElement>("[data-date]");
         const sessionButton = target.closest<HTMLButtonElement>("[data-session]");
+
+        if (target.closest("[data-action='retry-sessions']")) {
+          void loadDate(selected).then(() => {
+            if (!signal.aborted) paintSessions();
+          });
+          return;
+        }
 
         if (dateButton?.dataset.date && !dateButton.disabled) {
           selected = dateButton.dataset.date;
@@ -330,6 +362,14 @@ export const MovieDetailsPage: Page = ({ params, query, signal }) => {
     const resumed = await resumeHold();
     if (!resumed && requested && !requested.isSoldOut) requestBooking(requested);
   };
+
+  page.addEventListener(
+    "click",
+    (event) => {
+      if ((event.target as Element).closest("[data-action='retry-film']")) void load();
+    },
+    { signal },
+  );
 
   void load();
   return page;

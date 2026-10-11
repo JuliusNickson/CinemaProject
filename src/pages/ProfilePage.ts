@@ -5,7 +5,7 @@ import { getFilterOptions } from "../api/sessionsApi";
 import { getTickets, refundOrder } from "../api/ticketsApi";
 import { AgeBadge } from "../components/Badge";
 import { navigate, type Page } from "../router/router";
-import { appState, setUser } from "../state/appState";
+import { appState, isLoggedIn, setUser } from "../state/appState";
 import { requireAuth } from "../state/requireAuth";
 import type { Order } from "../types/ticket";
 import type { Venue } from "../types/venue";
@@ -227,6 +227,15 @@ function fieldMarkup({
 }
 
 export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
+  if (!isLoggedIn()) {
+    const returnTo = `/profile${window.location.search}`;
+    queueMicrotask(() => {
+      navigate("/", { replace: true });
+      requireAuth(() => navigate(returnTo));
+    });
+    return toElement(html`<section class="page profile-page"></section>`);
+  }
+
   document.title = readTab(query) === "tickets" ? "My tickets · Kino XII" : "Profile · Kino XII";
 
   const page = toElement(html`
@@ -244,26 +253,9 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
   const upcomingOrders = () => (orders ?? []).filter((order) => !isPastOrder(order));
   const pastOrders = () => (orders ?? []).filter(isPastOrder);
 
-  const renderGuestState = () => {
-    page.innerHTML = html`
-      <section class="page profile-page">
-        <div class="profile-page__notice">
-          <h1 class="page__title">Profile</h1>
-          <p class="page__placeholder">Please sign in to view and update your profile.</p>
-        </div>
-      </section>
-    `.value;
-  };
-
   const renderProfile = async () => {
     const current = appState.get().user;
-    if (!current) {
-      renderGuestState();
-      requireAuth(() => {
-        void renderProfile();
-      });
-      return;
-    }
+    if (!current) return;
 
     const filterOptions = appState.get().filterOptions ?? (await getFilterOptions(signal));
     if (signal.aborted) return;
@@ -525,9 +517,12 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
     const visible = when === "past" ? pastOrders() : upcomingOrders();
     if (visible.length === 0) {
       list.innerHTML = html`
-        <p class="ticket-list__message text-body-m text-secondary">
-          ${when === "past" ? "No past tickets." : "No upcoming tickets."}
-        </p>
+        <div class="ticket-list__message">
+          <p class="text-body-m text-secondary">
+            ${when === "past" ? "No past tickets." : "No upcoming tickets."}
+          </p>
+          ${when === "upcoming" && html`<a class="button button--tint" href="/sessions">Browse sessions</a>`}
+        </div>
       `.value;
       return;
     }
@@ -560,16 +555,22 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
     ticketsLoading = true;
     ticketsError = false;
     paintTickets();
+    let unauthorized = false;
     try {
       orders = await getTickets(undefined, signal);
     } catch (error) {
       if (signal.aborted) return;
+      if (error instanceof ApiError && error.isUnauthorized) {
+        unauthorized = true;
+        requireAuth(() => void loadTickets());
+        return;
+      }
       console.error("Tickets could not be loaded", error);
       ticketsError = true;
       orders = null;
     } finally {
       ticketsLoading = false;
-      if (!signal.aborted) {
+      if (!unauthorized && !signal.aborted) {
         paintCounts();
         paintTickets();
       }

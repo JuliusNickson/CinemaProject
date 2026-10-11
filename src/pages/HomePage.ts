@@ -1,4 +1,4 @@
-import { ApiError } from "../api/client";
+import { ApiError, failureText } from "../api/client";
 import { getComingSoon, getFeatured, getNowPlaying, notifyMe } from "../api/moviesApi";
 import { HeroCarousel } from "../components/HeroCarousel";
 import { icon } from "../components/icons";
@@ -51,7 +51,7 @@ function fillSlot<T>({ slot, signal, skeleton, errorMessage, load, render, rende
 
       const content = html`
         <div class="home-section__message" role="alert">
-          <p>${errorMessage}</p>
+          <p>${failureText(error, errorMessage)}</p>
           <button class="button button--tint" type="button" data-action="retry">Try again</button>
         </div>
       `;
