@@ -153,13 +153,69 @@
   color: var(--color-text-secondary);
 }
 
+.search-panel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 20px 22px;
+  text-align: center;
+}
+
+.search-panel__badge {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 16px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-raised);
+  color: var(--color-text-primary);
+}
+
+.search-panel__badge-icon {
+  width: 44px;
+  height: 44px;
+}
+
+.search-panel__title,
+.search-panel__hint {
+  margin: 0;
+}
+
+.search-panel__hint {
+  margin-top: 6px;
+  color: var(--color-text-secondary);
+}
+
+.search-panel__browse {
+  margin-top: 16px;
+  padding: 10px 18px;
+  background: var(--color-bg-raised);
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+
+.search-panel__browse:hover {
+  background: color-mix(in srgb, var(--color-bg-raised) 80%, white);
+}
+
+.search-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 2px;
+}
+
 .search-panel__list {
   display: flex;
   flex-direction: column;
+  max-height: 300px;
+  overflow: auto;
 }
 
 .search-hit {
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 8px;
@@ -201,8 +257,21 @@
   white-space: nowrap;
 }
 
-.navbar__search-input::-webkit-search-cancel-button {
-  filter: invert(1);
+.search-hit__price {
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.search-hit__soon {
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
+.navbar__search-input::-webkit-search-cancel-button,
+.navbar__search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
 }
 
 /* Signed-in user */

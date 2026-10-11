@@ -3,9 +3,9 @@ import { getCurrentPath, onRouteChange } from "../router/router";
 import { appState } from "../state/appState";
 import type { User } from "../types/auth";
 import type { Movie } from "../types/movie";
-import { formatDayMonth } from "../utils/date";
 import { html, toElement, type SafeHtml } from "../utils/dom";
-import { formatGenreRuntime } from "../utils/format";
+import { formatPrice } from "../utils/format";
+import popcornIcon from "../assets/popcorn.png";
 import { icon } from "./icons";
 
 export interface NavbarOptions {
@@ -227,20 +227,44 @@ export function Navbar(options: NavbarOptions = {}): HTMLElement {
     setSearchOpen(true);
   };
 
-  const searchMessage = (text: string) => paintSearch(html`<p class="search-panel__message text-body-s">${text}</p>`);
+  const browseSessions = html`<a class="button search-panel__browse" href="/sessions">Browse all sessions</a>`;
+
+  const searchPrompt = () =>
+    paintSearch(html`
+      <div class="search-panel__empty">
+        <span class="search-panel__badge"><img class="search-panel__badge-icon" src="${popcornIcon}" alt="" /></span>
+        <p class="search-panel__title text-label-m">What do you want to watch?</p>
+        <p class="search-panel__hint text-body-s">Search by title, director or cast</p>
+        ${browseSessions}
+      </div>
+    `);
+
+  const searchMiss = (query: string) =>
+    paintSearch(html`
+      <div class="search-panel__empty">
+        <span class="search-panel__badge">${icon("search")}</span>
+        <p class="search-panel__title text-label-m">No results for “${query}”</p>
+        <p class="search-panel__hint text-body-s">Check the spelling or try another film or live event.</p>
+        ${browseSessions}
+      </div>
+    `);
 
   const searchMeta = (movie: Movie): string => {
-    if (movie.isComingSoon) return `In cinemas ${formatDayMonth(movie.releaseDate, "long")}`;
-    return formatGenreRuntime(movie.genres[0]?.name, movie.runtimeMinutes);
+    const kind = movie.kind === "event" ? "Event" : "Film";
+    return `${kind} · ${movie.ageRating.code} · ${movie.runtimeMinutes} min`;
   };
 
-  const paintResults = (movies: Movie[]) => {
+  const paintResults = (movies: Movie[], query: string) => {
     if (movies.length === 0) {
-      searchMessage("No results found");
+      searchMiss(query);
       return;
     }
 
     paintSearch(html`
+      <div class="search-panel__head text-body-s">
+        <span class="text-overline text-secondary">FILMS & EVENTS</span>
+        <span class="text-secondary">${movies.length} ${movies.length === 1 ? "result" : "results"}</span>
+      </div>
       <div class="search-panel__list">
         ${movies.map(
           (movie) => html`
@@ -252,6 +276,9 @@ export function Navbar(options: NavbarOptions = {}): HTMLElement {
                 <span class="text-label-m">${movie.title}</span>
                 <span class="text-body-s text-secondary">${searchMeta(movie)}</span>
               </span>
+              ${movie.isComingSoon
+                ? html`<span class="search-hit__soon text-label-s">Coming Soon</span>`
+                : html`<span class="search-hit__price text-body-s">from ${formatPrice(movie.fromPrice, { spaced: false })}</span>`}
             </a>
           `,
         )}
@@ -264,11 +291,11 @@ export function Navbar(options: NavbarOptions = {}): HTMLElement {
     searchController?.abort();
 
     if (!query) {
-      searchMessage("Type a title to see films and live events");
+      searchPrompt();
       return;
     }
 
-    searchMessage("Searching…");
+    paintSearch(html`<p class="search-panel__message text-body-s">Searching…</p>`);
     const request = ++searchRequest;
     searchTimer = window.setTimeout(async () => {
       const controller = new AbortController();
@@ -276,11 +303,11 @@ export function Navbar(options: NavbarOptions = {}): HTMLElement {
       try {
         const movies = await searchMovies(query, controller.signal);
         if (request !== searchRequest) return;
-        paintResults(movies);
+        paintResults(movies, query);
       } catch (error) {
         if (controller.signal.aborted || request !== searchRequest) return;
         console.error("Search failed", error);
-        searchMessage("Search could not be loaded.");
+        paintSearch(html`<p class="search-panel__message text-body-s">Search could not be loaded.</p>`);
       }
     }, 300);
   };
@@ -289,7 +316,7 @@ export function Navbar(options: NavbarOptions = {}): HTMLElement {
     if (!(event.target as Element).closest(".navbar__search-input")) return;
     setMenuOpen(false);
     const query = searchInput()?.value.trim() ?? "";
-    if (!query) searchMessage("Type a title to see films and live events");
+    if (!query) searchPrompt();
     else setSearchOpen(true);
   });
 
