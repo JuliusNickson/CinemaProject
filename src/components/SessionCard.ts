@@ -1,6 +1,6 @@
 import type { Session } from "../types/session";
 import { html, type SafeHtml } from "../utils/dom";
-import { formatLanguage, formatPrice } from "../utils/format";
+import { formatPrice } from "../utils/format";
 import { icon } from "./icons";
 
 /** At or below this many seats the counter turns red. */
@@ -16,7 +16,7 @@ export function SessionCard(session: Session): SafeHtml {
     </span>
     <span class="session-card__bottom">
       <span class="session-card__place">
-        <span class="text-body-s text-secondary">${formatLanguage(session.language)}</span>
+        <span class="text-body-s text-secondary">${session.language.code}</span>
         <span class="text-label-s">${place}</span>
       </span>
       <span class="session-card__meta">

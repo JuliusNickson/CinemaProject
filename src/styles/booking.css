@@ -176,6 +176,12 @@
   max-width: 16px;
 }
 
+.booking__gap {
+  flex: 1 1 0;
+  max-width: 52px;
+  aspect-ratio: 1;
+}
+
 .seat {
   display: grid;
   flex: 1 1 0;

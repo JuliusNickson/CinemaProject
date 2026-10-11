@@ -102,22 +102,10 @@ function isPastOrder(order: Order): boolean {
   return !order.isUpcoming || order.status === "refunded";
 }
 
-/** Display only. The button follows `order.isRefundable` from the API. */
-function refundUntil(startsAt: string): string {
-  const cutoff = new Date(new Date(startsAt).getTime() - 2 * 60 * 60 * 1000);
-  if (Number.isNaN(cutoff.getTime())) return "";
-  const time = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(cutoff);
-  const day = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" }).format(cutoff);
-  return `${time}, ${day}`;
-}
-
 function ticketCard(order: Order, when: TicketWhen, refunding: boolean, error: string): SafeHtml {
   const { session } = order;
   const movie = session.movie;
-  const until = refundUntil(session.startsAt);
-  const reason = order.isRefundable
-    ? until && `Refundable until ${until}`
-    : "Refunds close 2 hours before the session.";
+  const reason = order.isRefundable ? "" : "Refunds close 2 hours before the session.";
 
   return html`
     <article class="ticket-card">
@@ -291,6 +279,7 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
 
     const values = { ...initial };
     const errors: Record<string, string> = {};
+    const serverErrors: Record<string, string> = {};
     const initialTab = readTab(query);
     const initialWhen = readWhen(query);
     const layout = toElement(html`
@@ -382,7 +371,11 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
     const touched = new Set<string>();
     const setFormState = (event?: Event) => {
       const target = event?.target;
-      if (target instanceof HTMLElement && target.getAttribute("name")) touched.add(target.getAttribute("name")!);
+      if (target instanceof HTMLElement && target.getAttribute("name")) {
+        const name = target.getAttribute("name")!;
+        touched.add(name);
+        delete serverErrors[name];
+      }
       const inputs = form.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select");
       for (const input of inputs) {
         const key = input.name as keyof typeof values;
@@ -402,7 +395,7 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
 
       for (const input of inputs) {
         const name = input.name;
-        const error = touched.has(name) ? validationErrors[name] : undefined;
+        const error = serverErrors[name] ?? (touched.has(name) ? validationErrors[name] : undefined);
         const field = input.closest(".profile-form__field");
         const errorNode = field?.querySelector(".profile-form__error");
         if (errorNode) errorNode.textContent = error ?? "";
@@ -458,8 +451,34 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
         await renderProfile();
       } catch (error) {
         console.error("Profile update failed", error);
-        const errorNode = form.querySelector(".profile-form__error");
-        if (errorNode) errorNode.textContent = "Profile could not be saved. Please try again.";
+        if (error instanceof ApiError && error.isUnauthorized) {
+          submitButton.disabled = false;
+          submitButton.textContent = "Save changes";
+          requireAuth(() => form.requestSubmit());
+          return;
+        }
+        if (error instanceof ApiError && error.isValidationError && error.errors) {
+          const fieldsByKey: Record<string, string> = {
+            fullName: "fullName",
+            full_name: "fullName",
+            mobileNumber: "mobileNumber",
+            mobile_number: "mobileNumber",
+            dateOfBirth: "dateOfBirth",
+            date_of_birth: "dateOfBirth",
+            preferredVenueId: "preferredVenueId",
+            preferred_venue_id: "preferredVenueId",
+          };
+          Object.keys(serverErrors).forEach((key) => delete serverErrors[key]);
+          Object.entries(error.errors).forEach(([key, messages]) => {
+            const field = fieldsByKey[key] ?? key;
+            serverErrors[field] = messages[0] ?? "Check this field";
+            touched.add(field);
+          });
+          setFormState();
+        } else {
+          const status = layout.querySelector(".profile-page__banner, .profile-page__status");
+          if (status) status.textContent = error instanceof ApiError ? error.message : "Profile could not be saved. Please try again.";
+        }
         submitButton.disabled = false;
         submitButton.textContent = "Save changes";
       }
@@ -559,15 +578,18 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
 
   const refund = async (reference: string) => {
     if (refunding.has(reference)) return;
+    if (!window.confirm("Refund this order? This cannot be undone.")) return;
     refunding.add(reference);
     refundErrors.delete(reference);
     paintTickets();
     try {
       const updated = await refundOrder(reference);
-      orders = (orders ?? []).map((order) =>
-        order.reference === reference ? { ...updated, status: "refunded", isUpcoming: false } : order,
-      );
+      orders = (orders ?? []).map((order) => (order.reference === reference ? updated : order));
     } catch (error) {
+      if (error instanceof ApiError && error.isUnauthorized) {
+        requireAuth(() => void refund(reference));
+        return;
+      }
       console.error("Refund failed", error);
       refundErrors.set(reference, error instanceof ApiError ? error.message : "This ticket could not be refunded.");
     } finally {

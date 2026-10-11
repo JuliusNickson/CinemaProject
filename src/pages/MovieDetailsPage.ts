@@ -1,4 +1,6 @@
+import { ApiError } from "../api/client";
 import { getMovie, getMovieSessions } from "../api/moviesApi";
+import { forgetHold, getHold, getSession, readHold } from "../api/sessionsApi";
 import { AgeBadge, Badge } from "../components/Badge";
 import { openBooking } from "../components/BookingModal";
 import { icon } from "../components/icons";
@@ -120,6 +122,7 @@ function pageMarkup(movie: MovieDetail, dates: string[], selected: string, total
           <div class="movie-dates" role="tablist" aria-label="Session dates">
             ${dates.map((date) => {
               const active = date === selected;
+              const bookable = movie.availableDates.includes(date);
               return html`
                 <button
                   class="movie-dates__day ${active && "movie-dates__day--active"}"
@@ -127,6 +130,7 @@ function pageMarkup(movie: MovieDetail, dates: string[], selected: string, total
                   role="tab"
                   data-date="${date}"
                   aria-selected="${active}"
+                  ${!bookable && "disabled"}
                 >
                   <span class="text-label-s">${formatWeekday(date)}</span>
                   <span class="text-h3">${parseIsoDate(date).getDate()}</span>
@@ -209,9 +213,10 @@ export const MovieDetailsPage: Page = ({ params, query, signal }) => {
     addRecentlyViewed(movie);
 
     const dates = upcomingIsoDates(DATE_COUNT);
+    const bookableDates = dates.filter((date) => movie.availableDates.includes(date));
     const byDate = new Map<string, VenueSessionsGroup[]>();
     const results = await Promise.all(
-      dates.map(async (date) => {
+      bookableDates.map(async (date) => {
         try {
           return [date, await getMovieSessions(movie.slug, date, signal)] as const;
         } catch (error) {
@@ -231,7 +236,7 @@ export const MovieDetailsPage: Page = ({ params, query, signal }) => {
     const sessionParam = query.get("session");
     const requestedId = sessionParam ? Number(sessionParam) : Number.NaN;
     const requested = Number.isInteger(requestedId) ? sessionById(requestedId) : undefined;
-    let selected = requested && dates.includes(requested.date) ? requested.date : dates[0];
+    let selected = requested && bookableDates.includes(requested.date) ? requested.date : (bookableDates[0] ?? dates[0]);
 
     const paintSessions = () => {
       const slot = page.querySelector<HTMLElement>("[data-slot='sessions']");
@@ -276,7 +281,7 @@ export const MovieDetailsPage: Page = ({ params, query, signal }) => {
         const dateButton = target.closest<HTMLButtonElement>("[data-date]");
         const sessionButton = target.closest<HTMLButtonElement>("[data-session]");
 
-        if (dateButton?.dataset.date) {
+        if (dateButton?.dataset.date && !dateButton.disabled) {
           selected = dateButton.dataset.date;
           page.querySelectorAll<HTMLButtonElement>("[data-date]").forEach((button) => {
             const active = button.dataset.date === selected;
@@ -295,7 +300,35 @@ export const MovieDetailsPage: Page = ({ params, query, signal }) => {
       { signal },
     );
 
-    if (requested && !requested.isSoldOut) requestBooking(requested);
+    const resumeHold = async () => {
+      const stored = readHold();
+      if (!stored || stored.movieSlug !== movie.slug) return false;
+
+      try {
+        const hold = await getHold(stored.holdId, signal);
+        if (signal.aborted) return true;
+        if (!hold.isLive) {
+          forgetHold();
+          showNotice("Your hold time expired. Please re-select your seats.");
+          return false;
+        }
+        const fresh = await getSession(hold.sessionId, signal);
+        if (signal.aborted) return true;
+        openBooking({ movie, session: fresh, signal, resume: hold });
+        return true;
+      } catch (error) {
+        if (signal.aborted) return true;
+        if (error instanceof ApiError && error.isUnauthorized) {
+          requireAuth(() => void resumeHold());
+          return true;
+        }
+        forgetHold();
+        return false;
+      }
+    };
+
+    const resumed = await resumeHold();
+    if (!resumed && requested && !requested.isSoldOut) requestBooking(requested);
   };
 
   void load();

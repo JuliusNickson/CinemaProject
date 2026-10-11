@@ -30,6 +30,36 @@ export async function holdSeats(sessionId: number, seats: HoldSeatInput[]): Prom
   return data;
 }
 
+const HOLD_STORAGE_KEY = "kinoxii.hold";
+
+export interface StoredHold {
+  holdId: string;
+  sessionId: number;
+  movieSlug: string;
+}
+
+/** Kept so a reload can resume checkout with `GET /holds/{hold}`. */
+export function rememberHold(hold: StoredHold): void {
+  sessionStorage.setItem(HOLD_STORAGE_KEY, JSON.stringify(hold));
+}
+
+export function readHold(): StoredHold | null {
+  const raw = sessionStorage.getItem(HOLD_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as StoredHold;
+    if (!parsed.holdId || !parsed.sessionId || !parsed.movieSlug) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function forgetHold(): void {
+  sessionStorage.removeItem(HOLD_STORAGE_KEY);
+}
+
 /** An expired hold still resolves, with `isLive: false`; an unknown one is a 404. */
 export async function getHold(holdId: string, signal?: AbortSignal): Promise<SeatHold> {
   const { data } = await get<ApiResponse<SeatHold>>(`/holds/${encodeURIComponent(holdId)}`, { signal });

@@ -1,9 +1,11 @@
 import { ApiError } from "../api/client";
-import { getSeatMap, holdSeats, releaseHold } from "../api/sessionsApi";
+import { forgetHold, getSeatMap, getSession, holdSeats, releaseHold, rememberHold } from "../api/sessionsApi";
 import { createOrder } from "../api/ticketsApi";
+import { navigate } from "../router/router";
 import { appState } from "../state/appState";
+import { requireAuth } from "../state/requireAuth";
 import type { Movie } from "../types/movie";
-import type { Seat, SeatMap, SeatState } from "../types/seat";
+import type { Seat, SeatHold, SeatMap, SeatState } from "../types/seat";
 import type { Session } from "../types/session";
 import type { Order, TicketType, TicketTypeSlug } from "../types/ticket";
 import { formatSessionDate, formatShortSessionDate } from "../utils/date";
@@ -15,6 +17,8 @@ export interface BookingOptions {
   movie: Movie;
   session: Session;
   signal: AbortSignal;
+  /** A live hold restored after reload. Opens on checkout. */
+  resume?: SeatHold;
 }
 
 interface Selection {
@@ -55,7 +59,7 @@ function countTickets(seats: { ticketType: { name: string } }[], types: TicketTy
     .join(", ");
 }
 
-export function openBooking({ movie, session, signal }: BookingOptions): void {
+export function openBooking({ movie, session, signal, resume }: BookingOptions): void {
   if (document.querySelector(".booking")) return;
 
   const options = appState.get().filterOptions;
@@ -65,19 +69,23 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
   );
   const maxSeats = options?.maxSeatsPerOrder ?? 3;
   const user = appState.get().user;
+  let shownSession = session;
 
   const root = toElement(html`<div class="booking" role="presentation"></div>`);
   const previousOverflow = document.body.style.overflow;
   document.body.style.overflow = "hidden";
   document.body.append(root);
 
-  let step: Step = "seats";
+  let step: Step = resume?.isLive ? "checkout" : "seats";
   let seatMap: SeatMap | null = null;
   let loadError = "";
   let alert = "";
-  let selection: Selection[] = [];
-  let holdId: string | null = null;
-  let expiresAt = 0;
+  let selection: Selection[] = resume?.isLive
+    ? resume.seats.map((seat) => ({ seatId: seat.seatId, code: seat.code, ticketType: seat.ticketType.slug }))
+    : [];
+  let holdId: string | null = resume?.isLive ? resume.holdId : null;
+  let expiresAt = resume?.isLive ? Date.parse(resume.expiresAt) : 0;
+  let heldSubtotal: number | null = resume?.isLive ? resume.subtotal : null;
   let order: Order | null = null;
   let paying = false;
   let holding = false;
@@ -97,7 +105,7 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
   const blocked = (type: TicketType) =>
     type.blockedFromRatingAge !== null && movie.ageRating.minAge >= type.blockedFromRatingAge;
 
-  const priceOf = (slug: TicketTypeSlug) => ticketPrice(session.price, typeBySlug(slug)?.priceRatio ?? 1);
+  const priceOf = (slug: TicketTypeSlug) => ticketPrice(shownSession.price, typeBySlug(slug)?.priceRatio ?? 1);
 
   const subtotal = () => selection.reduce((sum, seat) => sum + priceOf(seat.ticketType), 0);
 
@@ -105,7 +113,10 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
 
   const close = () => {
     window.clearInterval(timerId);
-    if (holdId && step !== "confirmed") void releaseHold(holdId).catch(() => undefined);
+    if (holdId && step !== "confirmed") {
+      void releaseHold(holdId).catch(() => undefined);
+      forgetHold();
+    }
     document.body.style.overflow = previousOverflow;
     root.remove();
   };
@@ -115,13 +126,15 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
     if (node) node.textContent = formatClock(secondsLeft());
   };
 
-  const expireHold = () => {
+  const expireHold = (message = "Your hold time expired. Please re-select your seats.") => {
     const expired = holdId;
     holdId = null;
     expiresAt = 0;
+    heldSubtotal = null;
     selection = [];
     step = "seats";
-    alert = "Your hold time expired. Please re-select your seats.";
+    alert = message;
+    forgetHold();
     if (expired) void releaseHold(expired).catch(() => undefined);
     void loadMap();
   };
@@ -176,6 +189,10 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
     });
 
   function seatButton(seat: Seat): SafeHtml {
+    if (seat.state === "unavailable") {
+      return html`<span class="booking__gap"></span>${seat.aisleAfter && html`<span class="booking__aisle"></span>`}`;
+    }
+
     const selected = selection.some((item) => item.seatId === seat.id);
     const state: SeatState | "selected" = selected ? "selected" : seat.state;
     const disabled = !selected && seat.state !== "available";
@@ -239,7 +256,7 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
               <button class="booking-pick__remove" type="button" data-remove="${seat.seatId}" aria-label="Remove seat ${seat.code}">×</button>
             </div>
             <div class="booking-pick__types">
-              ${ticketTypes.map((option) => {
+              ${ticketTypes.filter((option) => !blocked(option)).map((option) => {
                 const percent = Math.round(option.priceRatio * 100);
                 return html`
                   <button
@@ -310,14 +327,14 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
         <div class="booking-order">
           <div>
             <p class="text-button">${movie.title.toUpperCase()}</p>
-            <p class="booking-order__place text-body-s">Hall ${session.hall.name} · ${formatShortSessionDate(session.date)} · ${session.time}</p>
+            <p class="booking-order__place text-body-s">Hall ${shownSession.hall.name} · ${formatShortSessionDate(shownSession.date)} · ${shownSession.time}</p>
           </div>
           <div class="booking-order__row text-body-s"><span>Seats</span><strong>${selection.map((seat) => seat.code).join(", ")}</strong></div>
           <div class="booking-order__row text-body-s"><span>Tickets</span><strong>${countTickets(held, ticketTypes)}</strong></div>
         </div>
         <div class="booking__total">
           <span class="text-label-s">SUBTOTAL</span>
-          <span class="text-h1">${formatPrice(subtotal())}</span>
+          <span class="text-h1">${formatPrice(heldSubtotal ?? subtotal())}</span>
         </div>
         <button class="button button--primary booking__next" type="button" data-action="pay" ${(!contactReady() || paying) && "disabled"}>
           ${paying ? "Processing…" : "Pay & Complete Order"}
@@ -342,7 +359,7 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
             </div>
             <div>
               <p class="text-button">${movie.title.toUpperCase()}</p>
-              <p class="text-body-s text-secondary">${sessionLine(session)}</p>
+              <p class="text-body-s text-secondary">${sessionLine(shownSession)}</p>
             </div>
           </div>
           <div class="booking__ticket-row text-body-s"><span>Seats</span><strong>${order.tickets.map((ticket) => ticket.seatCode).join(", ")}</strong></div>
@@ -366,7 +383,7 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
           <header class="booking__header">
             <div>
               <h2 class="text-h2">${movie.title.toUpperCase()}</h2>
-              <p class="booking__meta text-body-s">${sessionLine(session, true)}</p>
+              <p class="booking__meta text-body-s">${sessionLine(shownSession, true)}</p>
             </div>
             <div class="booking__header-side">
               ${holdId &&
@@ -461,12 +478,24 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
     render();
   };
 
+  const dropContested = async (codes: string[]) => {
+    holdId = null;
+    expiresAt = 0;
+    heldSubtotal = null;
+    forgetHold();
+    alert = codes.length > 0 ? `These seats were just taken: ${codes.join(", ")}.` : "Some seats were just taken.";
+    selection = selection.filter((seat) => !codes.includes(seat.code));
+    step = "seats";
+    await loadMap(false);
+    markSold(codes);
+  };
+
   const hold = async () => {
     if (selection.length === 0 || holding || seatRuleViolations().length > 0) return;
     const currentUser = appState.get().user;
     if (!currentUser?.profileComplete) {
-      alert = "Please complete your profile to enable booking.";
-      render();
+      close();
+      navigate("/profile");
       return;
     }
     if (currentUser.age !== null && movie.ageRating.minAge > currentUser.age) {
@@ -485,19 +514,26 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
       );
       holdId = holdResult.holdId;
       expiresAt = Date.parse(holdResult.expiresAt);
+      heldSubtotal = holdResult.subtotal;
       selection = holdResult.seats.map((seat) => ({
         seatId: seat.seatId,
         code: seat.code,
         ticketType: seat.ticketType.slug,
       }));
+      rememberHold({ holdId: holdResult.holdId, sessionId: session.id, movieSlug: movie.slug });
       step = "checkout";
     } catch (error) {
+      if (error instanceof ApiError && error.isUnauthorized) {
+        requireAuth(() => void hold());
+        return;
+      }
       if (error instanceof ApiError && error.isConflict) {
-        const lost = error.contested ?? [];
-        alert = lost.length > 0 ? `These seats were just taken: ${lost.join(", ")}.` : "Some seats were just taken.";
-        selection = selection.filter((seat) => !lost.includes(seat.code));
-        await loadMap(false);
-        markSold(lost);
+        await dropContested(error.contested ?? []);
+        return;
+      }
+      if (error instanceof ApiError && error.isRuleViolation && !appState.get().user?.profileComplete) {
+        close();
+        navigate("/profile");
         return;
       }
       console.error("Could not hold seats", error);
@@ -532,8 +568,13 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
         cvv: fields.cvv.trim(),
       });
       holdId = null;
+      forgetHold();
       step = "confirmed";
     } catch (error) {
+      if (error instanceof ApiError && error.isUnauthorized) {
+        requireAuth(() => void pay());
+        return;
+      }
       if (error instanceof ApiError && error.isValidationError && error.errors) {
         const fieldsByKey: Record<string, keyof typeof fields> = {
           fullName: "fullName",
@@ -553,8 +594,9 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
           else alert = message;
         });
       } else if (error instanceof ApiError && error.isConflict) {
-        alert = error.message || "That selection is no longer available.";
-        step = "checkout";
+        await dropContested(error.contested ?? []);
+      } else if (error instanceof ApiError && error.isRuleViolation) {
+        expireHold(error.message);
       } else {
         console.error("Payment failed", error);
         alert = error instanceof ApiError ? error.message : "Payment could not be completed.";
@@ -633,6 +675,13 @@ export function openBooking({ movie, session, signal }: BookingOptions): void {
     paintTimer();
     if (secondsLeft() <= 0) expireHold();
   }, 1000);
+
+  void getSession(session.id, signal)
+    .then((fresh) => {
+      shownSession = fresh;
+      if (!signal.aborted && root.isConnected) render();
+    })
+    .catch(() => undefined);
 
   void loadMap();
 }

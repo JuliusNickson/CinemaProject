@@ -3,15 +3,6 @@ export function formatPrice(amount: number, { spaced = true }: { spaced?: boolea
   return `₾${spaced ? " " : ""}${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
 }
 
-/** `128` → `2h 8m`, `45` → `45m` */
-export function formatRuntime(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-
-  if (hours === 0) return `${rest}m`;
-  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
-}
-
 const SHORT_LANGUAGE_NAMES: Record<string, string> = {
   "georgian-subtitles": "Georgian Sub",
   "original-subtitles": "Original + Subtitles",

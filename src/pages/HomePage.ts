@@ -1,3 +1,4 @@
+import { ApiError } from "../api/client";
 import { getComingSoon, getFeatured, getNowPlaying, notifyMe } from "../api/moviesApi";
 import { HeroCarousel } from "../components/HeroCarousel";
 import { icon } from "../components/icons";
@@ -224,9 +225,13 @@ export const HomePage: Page = ({ signal }) => {
       notifiedSlugs().add(slug);
       button.outerHTML = NotifyButton(slug, true).value;
     } catch (error) {
-      console.error("Notify me failed", error);
       button.disabled = false;
       button.removeAttribute("aria-busy");
+      if (error instanceof ApiError && error.isUnauthorized) {
+        requireAuth(() => void notify(slug));
+        return;
+      }
+      console.error("Notify me failed", error);
       button.innerHTML = html`${icon("bell")}Try again`.value;
     }
   };
