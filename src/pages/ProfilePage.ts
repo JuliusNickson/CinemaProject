@@ -17,12 +17,45 @@ function formatDateValue(value: string | null): string {
   return value ?? "";
 }
 
-/** `555123456` → `555 123 456`, matching the profile form. */
+/** Groups a digit-only number as `555 123 456`. Other characters are left for validation. */
 function formatMobile(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 9);
+  if (/[^\d\s]/.test(value)) return value;
+  const digits = value.replace(/\D/g, "");
   if (digits.length <= 3) return digits;
   if (digits.length <= 6) return `${digits.slice(0, 3)} ${digits.slice(3)}`;
-  return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+  return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`;
+}
+
+function ageFromDate(iso: string): number | null {
+  if (!iso) return null;
+  const birthDate = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(birthDate.getTime())) return null;
+  const now = new Date();
+  if (birthDate > now) return null;
+  let age = now.getFullYear() - birthDate.getFullYear();
+  const birthdayPassed =
+    now.getMonth() > birthDate.getMonth() ||
+    (now.getMonth() === birthDate.getMonth() && now.getDate() >= birthDate.getDate());
+  if (!birthdayPassed) age -= 1;
+  return age;
+}
+
+/** Shown under the date of birth. The saved age is what blocks 16+ and 18+ films. */
+function agePurchaseNote(age: number): string {
+  const rule = "Your age controls 16+ and 18+ purchases.";
+  if (age < 16) return `You are ${age}. ${rule} You cannot buy tickets for 16+ or 18+ titles.`;
+  if (age < 18) return `You are ${age}. ${rule} You cannot buy tickets for 18+ titles.`;
+  return `You are ${age}. ${rule}`;
+}
+
+function mobileError(value: string): string | null {
+  if (!value.trim()) return "Mobile number is required";
+  if (/[^\d\s]/.test(value)) return "Please enter a valid Georgian mobile number (9 digits starting with 5)";
+  const digits = value.replace(/\s+/g, "");
+  if (!digits.startsWith("5")) return "Georgian mobile numbers must start with 5";
+  if (digits.length !== 9) return "Mobile number must be exactly 9 digits";
+  return null;
 }
 
 function validateProfile(values: Record<string, string | number | null>) {
@@ -33,25 +66,16 @@ function validateProfile(values: Record<string, string | number | null>) {
   else if (fullName.length < 3) errors.fullName = "Name must be at least 3 characters";
   else if (fullName.length > 50) errors.fullName = "Name must not exceed 50 characters";
 
-  const mobileNumber = String(values.mobileNumber ?? "").replace(/\s+/g, "");
-  if (!mobileNumber) errors.mobileNumber = "Mobile number is required";
-  else if (!/^5\d{8}$/.test(mobileNumber)) errors.mobileNumber = "Please enter a valid Georgian mobile number (9 digits starting with 5)";
+  const mobile = mobileError(String(values.mobileNumber ?? ""));
+  if (mobile) errors.mobileNumber = mobile;
 
   const dateOfBirth = String(values.dateOfBirth ?? "");
   if (!dateOfBirth) errors.dateOfBirth = "Date of birth is required";
-  else {
-    const birthDate = new Date(`${dateOfBirth}T00:00:00`);
-    const now = new Date();
-    if (Number.isNaN(birthDate.getTime())) errors.dateOfBirth = "Please enter a valid date of birth";
-    else if (birthDate > now) errors.dateOfBirth = "Please enter a valid date of birth";
-    else {
-      const age = now.getFullYear() - birthDate.getFullYear();
-      const hasBirthdayPassed =
-        now.getMonth() > birthDate.getMonth() ||
-        (now.getMonth() === birthDate.getMonth() && now.getDate() >= birthDate.getDate());
-      const calculatedAge = hasBirthdayPassed ? age : age - 1;
-      if (calculatedAge < 12) errors.dateOfBirth = "You must be at least 12 years old to create an account";
-    }
+  else if (Number.isNaN(new Date(`${dateOfBirth}T00:00:00`).getTime()) || new Date(`${dateOfBirth}T00:00:00`) > new Date()) {
+    errors.dateOfBirth = "Please enter a valid date of birth";
+  } else {
+    const age = ageFromDate(dateOfBirth);
+    if (age !== null && age < 12) errors.dateOfBirth = "You must be at least 12 years old to create an account";
   }
 
   return errors;
@@ -190,7 +214,7 @@ function fieldMarkup({
             (venue) => html`<option value="${venue.id}" ${String(venue.id) === String(selectedValue) && "selected"}>${venue.name}</option>`,
           )}
         </select>
-        ${error && html`<small class="profile-form__error">${error}</small>`}
+        <small class="profile-form__error">${error ?? ""}</small>
       </label>
     `;
   }
@@ -209,7 +233,7 @@ function fieldMarkup({
           `
         : html`<input id="${id}" name="${id}" type="${type}" value="${value}" placeholder="${placeholder}" ${disabled && "disabled"} />`}
       ${hint && html`<span class="profile-form__hint">${hint}</span>`}
-      ${error && html`<small class="profile-form__error">${error}</small>`}
+      <small class="profile-form__error">${error ?? ""}</small>
     </label>
   `;
 }
@@ -295,8 +319,9 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
         </div>
 
         <div class="profile-panel" data-panel="info" ${initialTab !== "info" && "hidden"}>
-          ${!current.profileComplete &&
-          html`<p class="profile-page__banner" role="status">Please complete your profile to enable booking.</p>`}
+          ${current.profileComplete
+            ? html`<p class="profile-page__status profile-page__status--complete" role="status">Profile Complete ✓</p>`
+            : html`<p class="profile-page__banner" role="status">Please complete your profile to enable booking.</p>`}
         <form class="profile-form" novalidate>
           <div class="profile-form__grid">
             ${fieldMarkup({ id: "fullName", label: "Full name", value: values.fullName, placeholder: "e.g. Text", error: errors.fullName })}
@@ -310,6 +335,7 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
             })}
             ${fieldMarkup({ id: "mobileNumber", label: "Mobile number", value: values.mobileNumber, placeholder: "e.g. Text", error: errors.mobileNumber })}
             ${fieldMarkup({ id: "dateOfBirth", label: "Date of birth", value: values.dateOfBirth, type: "date", error: errors.dateOfBirth })}
+            <p class="profile-form__age" data-age-note hidden></p>
             ${fieldMarkup({
               id: "preferredVenueId",
               label: "Preferred Venue (Optional)",
@@ -353,7 +379,10 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
 
     const form = layout.querySelector<HTMLFormElement>("form")!;
     const submitButton = form.querySelector<HTMLButtonElement>("button[type='submit']")!;
-    const setFormState = () => {
+    const touched = new Set<string>();
+    const setFormState = (event?: Event) => {
+      const target = event?.target;
+      if (target instanceof HTMLElement && target.getAttribute("name")) touched.add(target.getAttribute("name")!);
       const inputs = form.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select");
       for (const input of inputs) {
         const key = input.name as keyof typeof values;
@@ -373,11 +402,19 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
 
       for (const input of inputs) {
         const name = input.name;
-        const error = validationErrors[name];
+        const error = touched.has(name) ? validationErrors[name] : undefined;
         const field = input.closest(".profile-form__field");
         const errorNode = field?.querySelector(".profile-form__error");
         if (errorNode) errorNode.textContent = error ?? "";
         field?.classList.toggle("profile-form__field--invalid", Boolean(error));
+      }
+
+      const ageNote = form.querySelector<HTMLElement>("[data-age-note]");
+      const age = ageFromDate(String(values.dateOfBirth ?? ""));
+      const showAge = age !== null && age >= 12;
+      if (ageNote) {
+        ageNote.textContent = showAge ? agePurchaseNote(age) : "";
+        ageNote.hidden = !showAge;
       }
 
       const isDirty =
@@ -398,6 +435,7 @@ export const ProfilePage: Page = ({ query, signal, onQueryChange }) => {
       event.preventDefault();
       const validationErrors = validateProfile(values);
       if (Object.keys(validationErrors).length > 0) {
+        for (const name of Object.keys(validationErrors)) touched.add(name);
         setFormState();
         return;
       }

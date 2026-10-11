@@ -47,8 +47,10 @@
 }
 
 .profile-page__status--complete {
+  align-self: flex-start;
   background: rgb(74 222 128 / 0.12);
   color: var(--color-success);
+  text-transform: none;
 }
 
 .profile-page__status--incomplete {
@@ -200,6 +202,20 @@
   min-height: 18px;
   color: var(--color-brand);
   font-size: 12px;
+}
+
+.profile-form__error:empty {
+  display: none;
+}
+
+.profile-form__age {
+  margin: -8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.profile-form__age[hidden] {
+  display: none;
 }
 
 .profile-form__actions {
