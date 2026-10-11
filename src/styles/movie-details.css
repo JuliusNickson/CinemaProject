@@ -61,7 +61,7 @@
 .movie-hero__copy {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 20px;
   width: 580px;
   max-width: 100%;
   padding-bottom: 8px;
@@ -83,12 +83,15 @@
 
 .movie-page__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 441px;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1016fr) 325fr 431fr;
   align-items: start;
   max-width: var(--page-max-width);
   margin-inline: auto;
-  padding: 34px 51px 80px;
+  padding: 48px 88px 96px 60px;
+}
+
+.movie-facts {
+  grid-column: 3;
 }
 
 .movie-page__notice {
@@ -104,8 +107,8 @@
 .movie-sessions__heading {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  margin-bottom: var(--space-6);
+  gap: 8px;
+  margin-bottom: 32px;
 }
 
 .movie-sessions {
@@ -114,8 +117,8 @@
 
 .movie-dates {
   display: flex;
-  gap: 7px;
-  margin-bottom: var(--space-6);
+  gap: 12px;
+  margin-bottom: 36px;
   overflow-x: auto;
   scrollbar-width: thin;
 }
@@ -141,14 +144,19 @@
   background: var(--color-brand);
 }
 
+.movie-dates__day:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
 .venue-block {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .venue-block + .venue-block {
-  margin-top: var(--space-6);
+  margin-top: 40px;
 }
 
 .venue-block__name {
@@ -159,7 +167,7 @@
 .venue-block__halls {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
   align-items: flex-start;
 }
 
@@ -183,7 +191,7 @@
 .hall-card__grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 9px;
+  gap: 12px;
 }
 
 .showtime {
@@ -291,14 +299,13 @@
 .movie-facts {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  padding: 0 26px 26px;
+  gap: 28px;
 }
 
 .movie-facts__item {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .movie-facts__note {
@@ -319,6 +326,10 @@
   .movie-page__body {
     grid-template-columns: 1fr;
     padding-inline: var(--page-padding-x);
+  }
+
+  .movie-facts {
+    grid-column: auto;
   }
 
   .movie-hero__content {

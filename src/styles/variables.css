@@ -51,7 +51,7 @@
   --radius-full: 999px;
 
   /* Layout */
-  --page-max-width: 1728px;
+  --page-max-width: 1920px;
   --page-padding-x: var(--space-15);
   --section-padding-x: 70px;
   --hero-padding-x: 67px;
