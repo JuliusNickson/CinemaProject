@@ -9,7 +9,7 @@ import { appState } from "../state/appState";
 import { requireAuth } from "../state/requireAuth";
 import type { MovieDetail } from "../types/movie";
 import type { Session, VenueSessionsGroup } from "../types/session";
-import { formatFullDate, formatWeekday, parseIsoDate, upcomingIsoDates } from "../utils/date";
+import { formatFullDate, formatWeekday, hasStarted, parseIsoDate, upcomingIsoDates } from "../utils/date";
 import { html, toElement, type SafeHtml } from "../utils/dom";
 import { formatPrice } from "../utils/format";
 import { addRecentlyViewed } from "../utils/recentlyViewed";
@@ -37,12 +37,15 @@ function hallGroups(sessions: Session[]): [string, Session[]][] {
 }
 
 function showtimeMarkup(session: Session, blocked: boolean, ratingCode: string): SafeHtml {
-  const disabled = blocked || session.isSoldOut;
+  const ended = hasStarted(session.startsAt);
+  const disabled = blocked || session.isSoldOut || ended;
   const reason = blocked
     ? `This film is rated ${ratingCode}. You cannot buy tickets for it with this account.`
-    : session.isSoldOut
-      ? "Sold out"
-      : "Select seats";
+    : ended
+      ? "This session has already started."
+      : session.isSoldOut
+        ? "Sold out"
+        : "Select seats";
 
   return html`
     <button class="showtime" type="button" data-session="${session.id}" ${disabled && "disabled"} title="${reason}">
@@ -56,7 +59,7 @@ function showtimeMarkup(session: Session, blocked: boolean, ratingCode: string):
       <span class="showtime__split" aria-hidden="true"></span>
       <span class="showtime__aside">
         <span class="showtime__price">${formatPrice(session.price)}</span>
-        <span class="showtime__left text-body-s">${icon("seats")}${session.isSoldOut ? "Sold out" : `${session.seatsLeft} left`}</span>
+        <span class="showtime__left text-body-s">${icon("seats")}${ended ? "Ended" : session.isSoldOut ? "Sold out" : `${session.seatsLeft} left`}</span>
       </span>
     </button>
   `;
@@ -277,7 +280,13 @@ export const MovieDetailsPage: Page = ({ params, query, signal }) => {
     };
 
     const requestBooking = (chosen: Session) => {
-      if (chosen.isSoldOut || signal.aborted) return;
+      if (signal.aborted) return;
+      if (hasStarted(chosen.startsAt)) {
+        paintSessions();
+        showNotice("This session has already started.");
+        return;
+      }
+      if (chosen.isSoldOut) return;
 
       const openIfAllowed = () => {
         if (signal.aborted) return;

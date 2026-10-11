@@ -15,6 +15,12 @@ export function todayIso(): string {
   return toIsoDate(new Date());
 }
 
+/** True once a session's `startsAt` instant has passed. */
+export function hasStarted(startsAt: string): boolean {
+  const time = Date.parse(startsAt);
+  return Number.isFinite(time) && time <= Date.now();
+}
+
 /** Today and the following days, as `YYYY-MM-DD`. */
 export function upcomingIsoDates(count: number): string[] {
   const start = new Date();

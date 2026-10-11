@@ -1,4 +1,5 @@
 import type { Session } from "../types/session";
+import { hasStarted } from "../utils/date";
 import { html, type SafeHtml } from "../utils/dom";
 import { formatPrice } from "../utils/format";
 import { icon } from "./icons";
@@ -8,6 +9,9 @@ const LOW_SEATS = 10;
 
 export function SessionCard(session: Session): SafeHtml {
   const place = `${session.venue.name} · Hall ${session.hall.name}`;
+  const ended = hasStarted(session.startsAt);
+  const closed = session.isSoldOut || ended;
+  const status = ended ? "Ended" : "Sold out";
 
   const content = html`
     <span class="session-card__top">
@@ -20,8 +24,8 @@ export function SessionCard(session: Session): SafeHtml {
         <span class="text-label-s">${place}</span>
       </span>
       <span class="session-card__meta">
-        ${session.isSoldOut
-          ? html`<span class="session-card__seats text-body-s text-secondary">Sold out</span>`
+        ${closed
+          ? html`<span class="session-card__seats text-body-s text-secondary">${status}</span>`
           : html`
               <span class="session-card__seats ${session.seatsLeft <= LOW_SEATS && "session-card__seats--low"} text-body-s">
                 ${icon("seats")}${session.seatsLeft} left
@@ -32,9 +36,9 @@ export function SessionCard(session: Session): SafeHtml {
     </span>
   `;
 
-  if (session.isSoldOut) {
+  if (closed) {
     return html`
-      <div class="session-card session-card--sold-out" aria-disabled="true" aria-label="${session.time}, sold out">
+      <div class="session-card session-card--sold-out" aria-disabled="true" aria-label="${session.time}, ${status.toLowerCase()}">
         ${content}
       </div>
     `;

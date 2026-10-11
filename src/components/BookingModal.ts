@@ -8,7 +8,7 @@ import type { Movie } from "../types/movie";
 import type { Seat, SeatHold, SeatMap, SeatState } from "../types/seat";
 import type { Session } from "../types/session";
 import type { Order, TicketType, TicketTypeSlug } from "../types/ticket";
-import { formatSessionDate, formatShortSessionDate } from "../utils/date";
+import { formatSessionDate, formatShortSessionDate, hasStarted } from "../utils/date";
 import { html, toElement, type SafeHtml } from "../utils/dom";
 import { formatLanguage, formatPrice } from "../utils/format";
 import { icon } from "./icons";
@@ -61,6 +61,7 @@ function countTickets(seats: { ticketType: { name: string } }[], types: TicketTy
 
 export function openBooking({ movie, session, signal, resume }: BookingOptions): void {
   if (document.querySelector(".booking")) return;
+  if (!resume && hasStarted(session.startsAt)) return;
 
   const options = appState.get().filterOptions;
   const typeOrder = ["child", "student", "adult"];
