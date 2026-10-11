@@ -27,7 +27,7 @@ export function SessionCard(session: Session): SafeHtml {
                 ${icon("seats")}${session.seatsLeft} left
               </span>
             `}
-        <span class="text-button">${formatPrice(session.price, { spaced: false })}</span>
+        <span class="text-button">from ${formatPrice(session.price, { spaced: false })}</span>
       </span>
     </span>
   `;

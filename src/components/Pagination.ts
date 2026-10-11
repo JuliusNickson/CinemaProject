@@ -33,6 +33,7 @@ export function Pagination(current: number, last: number, hrefFor: (page: number
 
   return html`
     <nav class="pagination" aria-label="Pagination">
+      <span class="pagination__count">Page ${current} of ${last}</span>
       ${arrow("prev", current > 1 ? current - 1 : null, hrefFor)}
       ${pageItems(current, last).map((item) => {
         if (item === "gap") return html`<span class="pagination__gap" aria-hidden="true">...</span>`;

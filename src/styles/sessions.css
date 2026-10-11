@@ -425,6 +425,13 @@ a.session-card:hover .session-card__format {
   gap: var(--space-2);
 }
 
+.pagination__count {
+  margin-right: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+}
+
 .pagination__arrow,
 .pagination__page,
 .pagination__gap {
