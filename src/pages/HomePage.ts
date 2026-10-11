@@ -107,7 +107,7 @@ function homeMarkup(): SafeHtml {
           ${sectionHeader(
             "now-playing-title",
             "NOW PLAYING",
-            html`<a class="home-section__link text-label-m" href="/sessions">See all</a>`,
+            html`<a class="home-section__link text-label-m" href="/sessions">See All</a>`,
           )}
           <div data-slot="now-playing"></div>
         </section>
@@ -115,7 +115,7 @@ function homeMarkup(): SafeHtml {
         <section class="home-section home-section--coming-soon" aria-labelledby="coming-soon-title">
           ${sectionHeader(
             "coming-soon-title",
-            "COMING SOON...",
+            "Coming Soon",
             html`
               <button
                 class="home-section__link text-label-m"

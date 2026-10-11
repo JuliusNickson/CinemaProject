@@ -100,7 +100,7 @@ export function FilterSidebar(query: SessionsQuery, options: FilterOptions): Saf
       <div class="filter-sidebar__footer">
         ${active > 0 &&
         html`<button class="button button--outline filter-sidebar__clear" type="button" data-action="clear-filters">
-          Clear filters
+          Clear All Filters
         </button>`}
         <p class="text-body-s text-secondary" aria-live="polite">${active} ${active === 1 ? "filter" : "filters"} active</p>
       </div>
