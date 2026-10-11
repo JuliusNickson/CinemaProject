@@ -144,11 +144,23 @@
 .venue-block {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 14px;
 }
 
 .venue-block + .venue-block {
   margin-top: var(--space-6);
+}
+
+.venue-block__name {
+  font-size: 18px;
+  font-weight: var(--font-weight-extrabold);
+}
+
+.venue-block__halls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
 }
 
 .hall-card {
@@ -157,10 +169,15 @@
   gap: 9px;
   width: fit-content;
   max-width: 100%;
-  margin-top: var(--space-2);
   padding: 15px;
   border-radius: 18px;
   background: var(--color-bg-card);
+}
+
+.hall-card__name {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
 }
 
 .hall-card__grid {
@@ -207,18 +224,38 @@
   align-items: center;
 }
 
+.showtime__time {
+  font-size: 24px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 1;
+}
+
 .showtime__badges {
   display: flex;
+  align-items: center;
   gap: 6px;
 }
 
-.showtime__chip {
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
-  background: var(--color-bg-card);
+.showtime__lang {
   color: var(--color-text-secondary);
   font-size: 12px;
   line-height: normal;
+}
+
+.showtime__chip {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-raised);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  line-height: normal;
+}
+
+.showtime__price {
+  font-size: 20px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 1;
 }
 
 .showtime__split {

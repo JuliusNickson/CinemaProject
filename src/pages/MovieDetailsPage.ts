@@ -20,6 +20,10 @@ function ageBlocked(movie: MovieDetail): boolean {
   return movie.ageRating.minAge > user.age;
 }
 
+function hallLabel(name: string): string {
+  return /^hall\b/i.test(name) ? name : `Hall ${name}`;
+}
+
 function hallGroups(sessions: Session[]): [string, Session[]][] {
   const groups = new Map<string, Session[]>();
   sessions.forEach((session) => {
@@ -41,15 +45,15 @@ function showtimeMarkup(session: Session, blocked: boolean, ratingCode: string):
   return html`
     <button class="showtime" type="button" data-session="${session.id}" ${disabled && "disabled"} title="${reason}">
       <span class="showtime__main">
-        <span class="showtime__time text-h2">${session.time}</span>
+        <span class="showtime__time">${session.time}</span>
         <span class="showtime__badges">
-          <span class="showtime__chip text-body-s">${session.language.code}</span>
-          <span class="showtime__chip text-body-s">${session.format.name}</span>
+          <span class="showtime__lang">${session.language.code}</span>
+          <span class="showtime__chip">${session.format.name}</span>
         </span>
       </span>
       <span class="showtime__split" aria-hidden="true"></span>
       <span class="showtime__aside">
-        <span class="showtime__price text-h3">${formatPrice(session.price)}</span>
+        <span class="showtime__price">${formatPrice(session.price)}</span>
         <span class="showtime__left text-body-s">${icon("seats")}${session.isSoldOut ? "Sold out" : `${session.seatsLeft} left`}</span>
       </span>
     </button>
@@ -65,15 +69,17 @@ function sessionsMarkup(groups: VenueSessionsGroup[], blocked: boolean, ratingCo
     ${groups.map(
       (group) => html`
         <section class="venue-block">
-          <h3 class="text-button">${group.venue.name}</h3>
-          ${hallGroups(group.sessions).map(
-            ([hall, sessions]) => html`
-              <div class="hall-card">
-                <p class="text-label-s">${hall}</p>
-                <div class="hall-card__grid">${sessions.map((session) => showtimeMarkup(session, blocked, ratingCode))}</div>
-              </div>
-            `,
-          )}
+          <h3 class="venue-block__name">${group.venue.name}</h3>
+          <div class="venue-block__halls">
+            ${hallGroups(group.sessions).map(
+              ([hall, sessions]) => html`
+                <div class="hall-card">
+                  <p class="hall-card__name">${hallLabel(hall)}</p>
+                  <div class="hall-card__grid">${sessions.map((session) => showtimeMarkup(session, blocked, ratingCode))}</div>
+                </div>
+              `,
+            )}
+          </div>
         </section>
       `,
     )}
@@ -144,6 +150,13 @@ function pageMarkup(movie: MovieDetail, dates: string[], selected: string, total
             <div class="movie-facts__item">
               <p class="text-label-s text-secondary">MAIN CAST</p>
               <p class="text-label-m">${movie.cast}</p>
+            </div>
+          `}
+          ${movie.genres.length > 0 &&
+          html`
+            <div class="movie-facts__item">
+              <p class="text-label-s text-secondary">GENRE</p>
+              <p class="text-label-m">${movie.genres.map((genre) => genre.name).join(", ")}</p>
             </div>
           `}
           <div class="movie-facts__item">
