@@ -1,7 +1,5 @@
 # Kino XII
 
-Cinema site built with TypeScript and Vite. It talks to the Kino XII API and has no other dependencies.
-
 ## Run
 
 ```bash
